@@ -6,9 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: medqur-build-${{ github.ref }}
@@ -68,15 +66,14 @@ jobs:
           path: build/web
           if-no-files-found: error
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - name: Publish web build to gh-pages branch
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          enablement: true
-
-      - name: Package GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
+          publish_branch: gh-pages
+          force_orphan: true
 
   ios:
     name: iOS unsigned
@@ -118,15 +115,3 @@ jobs:
           name: Medqur-iOS-Unsigned
           path: Medqur-iOS-unsigned.zip
           if-no-files-found: error
-
-  deploy-pages:
-    name: Deploy web prototype
-    needs: android-and-web
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
