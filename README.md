@@ -55,6 +55,8 @@ GitHub Actions regenerates the Flutter platform scaffolding, adds camera/biometr
 - Flutter web release + `gh-pages`
 - unsigned iOS release app
 
+The V0.2 workflow is the release gate for every push to `main`.
+
 See `.github/workflows/build.yml`.
 
 ## Architecture
