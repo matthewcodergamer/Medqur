@@ -1,0 +1,132 @@
+name: Build Medqur
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: medqur-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-and-web:
+    name: Android + Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android and web platform scaffolding
+        shell: bash
+        run: |
+          rm -rf /tmp/medqur_seed
+          flutter create \
+            --platforms=android,web \
+            --org com.herbcure \
+            --project-name medqur \
+            /tmp/medqur_seed
+          cp -R /tmp/medqur_seed/android ./android
+          cp -R /tmp/medqur_seed/web ./web
+          sed -i 's/android:label="medqur"/android:label="Medqur"/' android/app/src/main/AndroidManifest.xml || true
+          sed -i 's/<title>medqur<\/title>/<title>Medqur<\/title>/' web/index.html || true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build release web app
+        run: flutter build web --release --base-href "/Medqur/"
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Medqur-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Medqur-Web
+          path: build/web
+          if-no-files-found: error
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Package GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  ios:
+    name: iOS unsigned
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate iOS platform scaffolding
+        shell: bash
+        run: |
+          rm -rf /tmp/medqur_seed
+          flutter create \
+            --platforms=ios \
+            --org com.herbcure \
+            --project-name medqur \
+            /tmp/medqur_seed
+          cp -R /tmp/medqur_seed/ios ./ios
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Medqur" ios/Runner/Info.plist || true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build unsigned iOS release app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned iOS app
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios/iphoneos/Runner.app Medqur-iOS-unsigned.zip
+
+      - name: Upload unsigned iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Medqur-iOS-Unsigned
+          path: Medqur-iOS-unsigned.zip
+          if-no-files-found: error
+
+  deploy-pages:
+    name: Deploy web prototype
+    needs: android-and-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
