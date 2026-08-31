@@ -17,3 +17,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/medqur_logo.png
+    - assets/ministry_health_logo.png
