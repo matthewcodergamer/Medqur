@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../widgets/common.dart';
 
 enum ScanPurpose { staffBadge, patientWristband, nidsCard, medication }
 
@@ -79,8 +78,8 @@ class _LiveScannerPageState extends State<LiveScannerPage> {
         title: Text(widget.purpose.title, style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           if (!kIsWeb)
-            IconButton(tooltip: 'Flash', onPressed: _controller.toggleTorch, icon: const Icon(Icons.flashlight_on_rounded)),
-          IconButton(tooltip: 'Switch camera', onPressed: _controller.switchCamera, icon: const Icon(Icons.cameraswitch_rounded)),
+            IconButton(tooltip: 'Flash', onPressed: () => _controller.toggleTorch(), icon: const Icon(Icons.flashlight_on_rounded)),
+          IconButton(tooltip: 'Switch camera', onPressed: () => _controller.switchCamera(), icon: const Icon(Icons.cameraswitch_rounded)),
         ],
       ),
       body: Stack(
@@ -92,7 +91,7 @@ class _LiveScannerPageState extends State<LiveScannerPage> {
             onDetect: _onDetect,
             tapToFocus: true,
             placeholderBuilder: (_) => const Center(child: CircularProgressIndicator(color: Colors.white)),
-            errorBuilder: (context, error) => _CameraError(error: error, retry: _controller.start),
+            errorBuilder: (context, error) => _CameraError(error: error, retry: () => _controller.start()),
           ),
           IgnorePointer(child: CustomPaint(painter: _ScanOverlayPainter(widget.purpose))),
           SafeArea(

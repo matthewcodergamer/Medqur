@@ -40,8 +40,9 @@ jobs:
 
       - name: Configure permissions, native auth and icons
         run: |
-          python3 -m pip install --user pillow
-          python3 tool/configure_platforms.py
+          python3 -m venv .icons-venv
+          .icons-venv/bin/python -m pip install pillow
+          .icons-venv/bin/python tool/configure_platforms.py
 
       - name: Install dependencies
         run: flutter pub get
@@ -104,8 +105,9 @@ jobs:
 
       - name: Configure camera, Face ID and icons
         run: |
-          python3 -m pip install --user pillow
-          python3 tool/configure_platforms.py
+          python3 -m venv .icons-venv
+          .icons-venv/bin/python -m pip install pillow
+          .icons-venv/bin/python tool/configure_platforms.py
 
       - name: Install dependencies
         run: flutter pub get
