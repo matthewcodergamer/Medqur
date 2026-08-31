@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models.dart';
 import '../widgets/common.dart';
+import 'new_encounter_page.dart';
 import 'orders_tasks_page.dart';
 import 'patient_detail_page.dart';
 import 'patient_queue_page.dart';
@@ -52,6 +53,15 @@ class _ClinicalShellState extends State<ClinicalShell> {
     );
   }
 
+  Future<void> newEncounter() async {
+    final patient = await Navigator.of(context).push<Patient>(
+      MaterialPageRoute(builder: (_) => const NewEncounterPage()),
+    );
+    if (patient == null || !mounted) return;
+    setState(() => widget.patients.insert(0, patient));
+    openPatient(patient);
+  }
+
   Widget page() {
     switch (index) {
       case 0:
@@ -59,6 +69,7 @@ class _ClinicalShellState extends State<ClinicalShell> {
           staff: widget.staff,
           patients: widget.patients,
           onOpenPatient: openPatient,
+          onNewEncounter: newEncounter,
         );
       case 1:
         return ScanPage(
