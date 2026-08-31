@@ -37,8 +37,11 @@ jobs:
             /tmp/medqur_seed
           cp -R /tmp/medqur_seed/android ./android
           cp -R /tmp/medqur_seed/web ./web
-          sed -i 's/android:label="medqur"/android:label="Medqur"/' android/app/src/main/AndroidManifest.xml || true
-          sed -i 's/<title>medqur<\/title>/<title>Medqur<\/title>/' web/index.html || true
+
+      - name: Configure permissions, native auth and icons
+        run: |
+          python3 -m pip install --user pillow
+          python3 tool/configure_platforms.py
 
       - name: Install dependencies
         run: flutter pub get
@@ -98,7 +101,11 @@ jobs:
             --project-name medqur \
             /tmp/medqur_seed
           cp -R /tmp/medqur_seed/ios ./ios
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Medqur" ios/Runner/Info.plist || true
+
+      - name: Configure camera, Face ID and icons
+        run: |
+          python3 -m pip install --user pillow
+          python3 tool/configure_platforms.py
 
       - name: Install dependencies
         run: flutter pub get

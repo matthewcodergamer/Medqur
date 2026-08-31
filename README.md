@@ -1,135 +1,62 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype designed to demonstrate a simpler, safer point-of-care experience for Jamaica's public health system.
+Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.2 focuses on real device interaction while keeping government/EHR integrations explicitly simulated until approved backend interfaces exist.
 
-This repository is an **interactive product prototype**, not a live medical system. Every patient, staff account, identifier, clinical value, scan result, and government integration shown in the demo is simulated.
+> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, medication administration or storage of protected health information.
 
-## V0.1 workflow
+## V0.2
 
-The current prototype demonstrates one connected hospital journey:
+### Real device functionality
 
-1. Secure-looking staff sign-in using a Medqur staff ID and simulated device authentication.
-2. Doctor or nurse role demo.
-3. Authorized facility selection with a simulated location suggestion.
-4. Patient registration through a simulated NIDS/NIC, visitor passport, or emergency/unknown identity route.
-5. Triage selection and encounter creation.
-6. QR-style encounter wristband generation.
-7. Prioritized patient queue.
-8. Patient record with complaint, vitals, allergies, identity state, medications, and encounter timeline.
-9. Doctor medication order entry with structured dose, route, and frequency fields.
-10. Nurse medication task list with scan/verification simulation before administration.
-11. Administration recorded back into the encounter timeline.
-12. Digital staff ID, active facility, and shift/session profile.
+- Live camera scanner on Android, iOS and the HTTPS web build.
+- Camera permission request handled by the scanner/browser/OS.
+- QR, Data Matrix and common linear barcode capture for staff, identity, wristband and medication workflows.
+- Staff badge camera overlay, NIDS/NIC card overlay, wristband frame and medication barcode frame.
+- Native Android/iOS fingerprint/Face ID authentication through `local_auth`.
+- Scannable staff badge and patient encounter QR tokens.
+- Local prototype persistence so demo patients/orders survive restarts/refreshes.
+- Doctor/nurse role policy boundary.
+- Patient assignment.
+- Doctor medication orders with an optional mapped package barcode.
+- Nurse closed-loop flow: scan patient wristband, scan medication package, require both to match, then record administration.
+- FHIR-shaped integration adapter boundary.
 
-## Product direction
+### Not connected yet
 
-Medqur is designed as a future mobile clinical workflow, identity, patient-flow, and medication-safety layer. A production deployment would integrate only through Ministry/Government-approved interfaces and healthcare interoperability standards such as FHIR/HL7 where available.
+- NIRA/NIDS production verification
+- Ministry of Health production identity/services
+- e-Care / SystmOne
+- secure browser passkey relying-party server
+- production cross-device realtime backend
+- production clinical database or audit service
 
-The prototype intentionally does **not** connect to:
+The browser build can use the camera, but secure browser passkeys require a server-generated WebAuthn challenge. V0.2 does not fake that security step; the web sign-in is clearly marked as prototype access.
 
-- NIDS / NIRA production services
-- Jamaica e-Care / SystmOne
-- Ministry of Health production systems
-- real patient records
-- real biometrics or passkeys
+## Medication identification
 
-The NIDS/NIC demo represents a minimum-data, consent-based verification request rather than copying an entire national identity record into Medqur.
+Medqur does **not** require every medicine to receive a custom Medqur QR. The scanner accepts both 2D and linear codes. In a production deployment, a scanned GTIN/GS1 code (or a hospital-generated unit-dose code where necessary) would resolve against an approved medication/product master before it can match an active order.
 
-## UI approach
-
-The interface uses a calm medical visual system: white and pale-blue surfaces, Medqur blue for primary actions, restrained status colors, large readable controls, and short fade/slide transitions. Animation is used only to clarify navigation and scanning rather than decorate the interface.
-
-The layout adapts to phone, tablet, and desktop/web widths. Phones use bottom navigation while larger screens use a clinical side navigation rail.
-
-## Demo accounts
+## Demo staff IDs
 
 - Doctor: `MQ-7K4P-92XF`
 - Nurse: `MQ-2N8R-41KD`
 
-The sign-in screen pre-fills the selected demo account. Authentication is simulated.
+The ID field starts empty. Use **Use demo ID** for quick public-prototype access.
 
-## Run locally
+## Branding
 
-Install the Flutter stable channel, then run:
-
-```bash
-flutter create --platforms=android,ios,web --org com.herbcure --project-name medqur .
-flutter pub get
-flutter run
-```
-
-The repository keeps the product source small; platform scaffolding can be generated by Flutter when needed.
+The Medqur wordmark is drawn as vector UI instead of the old raster image, eliminating the grey rectangle visible in some browsers. `assets/medqur_app_icon.svg` is the canonical high-quality app/favicon artwork: blue Medqur mark on white, matching the supplied icon. CI generates Android, iOS and web raster icon sizes from the same geometry.
 
 ## Build
 
-### Web
+GitHub Actions regenerates the Flutter platform scaffolding, adds camera/biometric permissions, creates branded icons, runs analysis, and builds:
 
-```bash
-flutter build web --release --base-href "/Medqur/"
-```
-
-### Android APK
-
-```bash
-flutter build apk --release
-```
-
-### iOS unsigned build
-
-```bash
-flutter build ios --release --no-codesign
-```
-
-A distributable App Store/TestFlight iOS package requires an Apple signing identity and provisioning profile. The GitHub workflow therefore publishes an unsigned iOS application artifact for prototype validation, plus a release Android APK and web build.
-
-## Automated builds
-
-GitHub Actions builds Medqur on every push to `main`:
-
-- Flutter web release
 - Android release APK
+- Flutter web release + `gh-pages`
 - unsigned iOS release app
-- GitHub Pages deployment for the web prototype
 
-Build outputs are published as workflow artifacts.
+See `.github/workflows/build.yml`.
 
-## Security architecture for a production phase
+## Architecture
 
-The prototype UI reflects the intended direction, but production implementation would require a formal security/privacy program. Core principles include:
-
-- Staff IDs are identifiers, not passwords.
-- Device-bound passkeys and OS biometrics authorize staff access.
-- Biometric templates remain in the device security hardware and are not stored by Medqur.
-- Role-, facility-, and purpose-based access controls restrict records.
-- Patient wristbands carry opaque/random encounter tokens rather than confidential clinical data.
-- Clinical/security audit events are append-only and attributable to a staff identity.
-- Emergency care can begin under a temporary identity and be reconciled later.
-- Government and EHR systems remain authoritative rather than being copied into one giant Medqur database.
-
-## Repository structure
-
-```text
-lib/
-  medqur_app.dart
-  models.dart
-  mock_data.dart
-  screens/
-    sign_in_screen.dart
-    facility_screen.dart
-    clinical_shell.dart
-    patient_queue_page.dart
-    new_encounter_page.dart
-    scan_page.dart
-    patient_detail_page.dart
-    orders_tasks_page.dart
-    profile_page.dart
-  widgets/
-    common.dart
-assets/
-  medqur_logo.png
-  ministry_health_logo.png
-```
-
----
-
-**Prototype notice:** Medqur V0.1 is for product demonstration and software design validation only. It must not be used for diagnosis, treatment decisions, medication administration, patient identification, or storage of real protected health information.
+See [`docs/V0.2_ARCHITECTURE.md`](docs/V0.2_ARCHITECTURE.md) for the backend, FHIR, role, realtime and security boundaries.

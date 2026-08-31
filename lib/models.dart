@@ -20,17 +20,12 @@ class StaffProfile {
   final String title;
   final String registration;
   final List<Facility> facilities;
+
+  String get badgeToken => 'medqur://staff/$id';
 }
 
 class Facility {
-  const Facility({
-    required this.id,
-    required this.name,
-    required this.area,
-    required this.type,
-    this.suggested = false,
-  });
-
+  const Facility({required this.id, required this.name, required this.area, required this.type, this.suggested = false});
   final String id;
   final String name;
   final String area;
@@ -46,6 +41,7 @@ class MedicationOrder {
     required this.frequency,
     required this.orderedBy,
     this.administered = false,
+    this.productCode,
   });
 
   final String name;
@@ -54,14 +50,36 @@ class MedicationOrder {
   final String frequency;
   final String orderedBy;
   final bool administered;
+  final String? productCode;
 
-  MedicationOrder copyWith({bool? administered}) => MedicationOrder(
+  MedicationOrder copyWith({bool? administered, String? productCode}) => MedicationOrder(
         name: name,
         dose: dose,
         route: route,
         frequency: frequency,
         orderedBy: orderedBy,
         administered: administered ?? this.administered,
+        productCode: productCode ?? this.productCode,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'dose': dose,
+        'route': route,
+        'frequency': frequency,
+        'orderedBy': orderedBy,
+        'administered': administered,
+        'productCode': productCode,
+      };
+
+  factory MedicationOrder.fromJson(Map<String, dynamic> json) => MedicationOrder(
+        name: json['name']?.toString() ?? '',
+        dose: json['dose']?.toString() ?? '',
+        route: json['route']?.toString() ?? '',
+        frequency: json['frequency']?.toString() ?? '',
+        orderedBy: json['orderedBy']?.toString() ?? '',
+        administered: json['administered'] == true,
+        productCode: json['productCode']?.toString(),
       );
 }
 
@@ -80,6 +98,8 @@ class Patient {
     required this.allergies,
     required this.timeline,
     required this.medications,
+    this.assignedStaffId,
+    this.assignedStaffName,
   });
 
   final String id;
@@ -95,4 +115,50 @@ class Patient {
   final List<String> allergies;
   final List<String> timeline;
   final List<MedicationOrder> medications;
+  String? assignedStaffId;
+  String? assignedStaffName;
+
+  String get encounterToken => 'medqur://encounter/$id';
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'age': age,
+        'sex': sex,
+        'nidsStatus': nidsStatus,
+        'chiefComplaint': chiefComplaint,
+        'triage': triage.name,
+        'status': status.name,
+        'waitMinutes': waitMinutes,
+        'vitals': vitals,
+        'allergies': allergies,
+        'timeline': timeline,
+        'medications': medications.map((item) => item.toJson()).toList(),
+        'assignedStaffId': assignedStaffId,
+        'assignedStaffName': assignedStaffName,
+      };
+
+  factory Patient.fromJson(Map<String, dynamic> json) {
+    final triageName = json['triage']?.toString();
+    final statusName = json['status']?.toString();
+    return Patient(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unknown patient',
+      age: (json['age'] as num?)?.toInt() ?? 0,
+      sex: json['sex']?.toString() ?? 'Unknown',
+      nidsStatus: json['nidsStatus']?.toString() ?? 'Identity pending',
+      chiefComplaint: json['chiefComplaint']?.toString() ?? '',
+      triage: TriageLevel.values.firstWhere((item) => item.name == triageName, orElse: () => TriageLevel.routine),
+      status: PatientStatus.values.firstWhere((item) => item.name == statusName, orElse: () => PatientStatus.waiting),
+      waitMinutes: (json['waitMinutes'] as num?)?.toInt() ?? 0,
+      vitals: (json['vitals'] as Map<String, dynamic>? ?? {}).map((key, value) => MapEntry(key, value.toString())),
+      allergies: (json['allergies'] as List<dynamic>? ?? []).map((item) => item.toString()).toList(),
+      timeline: (json['timeline'] as List<dynamic>? ?? []).map((item) => item.toString()).toList(),
+      medications: (json['medications'] as List<dynamic>? ?? [])
+          .map((item) => MedicationOrder.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      assignedStaffId: json['assignedStaffId']?.toString(),
+      assignedStaffName: json['assignedStaffName']?.toString(),
+    );
+  }
 }

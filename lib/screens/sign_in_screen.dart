@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../mock_data.dart';
 import '../models.dart';
+import '../services/device_auth.dart';
 import '../widgets/common.dart';
+import 'live_scanner_page.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key, required this.onSignedIn});
@@ -11,16 +14,68 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _controller = TextEditingController(text: 'MQ-7K4P-92XF');
-  StaffRole _role = StaffRole.doctor;
+  final _controller = TextEditingController();
+  final _deviceAuth = DeviceAuthService();
   bool _authenticating = false;
 
-  Future<void> _signIn() async {
-    if (_controller.text.trim().isEmpty) return;
+  StaffProfile? _resolveStaff(String input) {
+    final id = input.trim().toUpperCase();
+    if (id == demoDoctor.id) return demoDoctor;
+    if (id == demoNurse.id) return demoNurse;
+    return null;
+  }
+
+  Future<void> _continue() async {
+    final staff = _resolveStaff(_controller.text);
+    if (staff == null) {
+      _message('Enter a valid Medqur staff ID.');
+      return;
+    }
     setState(() => _authenticating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 650));
+    final result = await _deviceAuth.authenticate(staffId: staff.id);
     if (!mounted) return;
-    widget.onSignedIn(_role == StaffRole.doctor ? demoDoctor : demoNurse);
+    setState(() => _authenticating = false);
+
+    if (result.success) {
+      widget.onSignedIn(staff);
+      return;
+    }
+    if (kIsWeb && !result.supported) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.key_rounded, color: medqurBlue),
+          title: const Text('Browser prototype'),
+          content: const Text('Camera scanning works in the web build. Secure browser passkeys need the Medqur authentication server, so this public prototype cannot pretend a biometric check succeeded.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue prototype')),
+          ],
+        ),
+      );
+      if (proceed == true && mounted) widget.onSignedIn(staff);
+      return;
+    }
+    _message(result.message);
+  }
+
+  Future<void> _scanBadge() async {
+    final capture = await Navigator.of(context).push<ScanCapture>(
+      MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.staffBadge)),
+    );
+    if (capture == null || !mounted) return;
+    var value = capture.value.trim();
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.scheme == 'medqur' && uri.host == 'staff' && uri.pathSegments.isNotEmpty) {
+      value = uri.pathSegments.last;
+    }
+    _controller.text = value.toUpperCase();
+    await _continue();
+  }
+
+  void _message(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value), behavior: SnackBarBehavior.floating));
   }
 
   @override
@@ -34,113 +89,76 @@ class _SignInScreenState extends State<SignInScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 860;
-            if (wide) {
-              return Row(children: [Expanded(child: _brandPanel()), Expanded(child: _formPanel(maxWidth: 500))]);
-            }
-            return _formPanel(maxWidth: 520, showBrandHeader: true);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _brandPanel() => Container(
-        margin: const EdgeInsets.all(18),
-        padding: const EdgeInsets.all(44),
-        decoration: BoxDecoration(color: const Color(0xFFF1F6FF), borderRadius: BorderRadius.circular(32)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const MedqurLogo(width: 230),
-            const Spacer(),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-              child: const Icon(Icons.health_and_safety_rounded, color: medqurBlue, size: 34),
-            ),
-            const SizedBox(height: 22),
-            const Text('Connected care.\nSafer decisions.', style: TextStyle(fontSize: 38, height: 1.08, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: medqurInk)),
-            const SizedBox(height: 16),
-            const Text('A clinical workflow prototype for faster patient flow, clear medication orders, and secure identity verification.', style: TextStyle(fontSize: 16, height: 1.5, color: Color(0xFF5C6B7D))),
-            const Spacer(),
-            const Row(children: [Icon(Icons.lock_outline_rounded, size: 18, color: medqurGreen), SizedBox(width: 8), Text('Prototype uses simulated data only', style: TextStyle(color: Color(0xFF5C6B7D), fontWeight: FontWeight.w700))]),
-          ],
-        ),
-      );
-
-  Widget _formPanel({required double maxWidth, bool showBrandHeader = false}) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showBrandHeader) ...[
-                const Center(child: MedqurLogo(width: 190)),
-                const SizedBox(height: 28),
-              ],
-              const FadeSlideIn(
-                child: Row(children: [
-                  MinistryLogo(size: 56),
-                  SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Healthcare staff access', style: TextStyle(fontSize: 13, color: Color(0xFF738196), fontWeight: FontWeight.w700)),
-                    SizedBox(height: 3),
-                    Text('Medqur clinical workspace', style: TextStyle(fontSize: 17, color: medqurInk, fontWeight: FontWeight.w800)),
-                  ])),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 860;
+          return Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 24, vertical: 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Center(child: MedqurLogo(width: wide ? 215 : 188)),
+                  const SizedBox(height: 22),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFD), border: Border.all(color: medqurLine), borderRadius: BorderRadius.circular(16)),
+                    child: const Row(children: [
+                      SizedBox(width: 48, height: 48, child: Center(child: MinistryLogo(size: 42))),
+                      SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Ministry of Health & Wellness', style: TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 14)),
+                        SizedBox(height: 2),
+                        Text('Jamaica • healthcare staff access', style: TextStyle(color: Color(0xFF748297), fontSize: 12)),
+                      ])),
+                    ]),
+                  ),
+                  const SizedBox(height: 32),
+                  const FadeSlideIn(child: Text('Sign in', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: medqurInk, letterSpacing: -1))),
+                  const SizedBox(height: 7),
+                  const Text('Enter your staff ID, then verify on this device.', style: TextStyle(fontSize: 15, color: Color(0xFF65748A))),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _controller,
+                    textCapitalization: TextCapitalization.characters,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    onSubmitted: (_) => _continue(),
+                    decoration: const InputDecoration(labelText: 'Staff ID', hintText: 'MQ-XXXX-XXXX', prefixIcon: Icon(Icons.badge_outlined)),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => setState(() => _controller.text = demoDoctor.id),
+                      child: const Text('Use demo ID'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: _authenticating ? null : _continue,
+                    icon: _authenticating
+                        ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
+                        : const Icon(Icons.fingerprint_rounded),
+                    label: Text(_authenticating ? 'Verifying…' : 'Verify & continue'),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: _authenticating ? null : _scanBadge,
+                    icon: const Icon(Icons.badge_outlined),
+                    label: const Text('Scan staff ID'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52), foregroundColor: medqurInk, side: const BorderSide(color: medqurLine), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  ),
+                  const SizedBox(height: 20),
+                  const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.lock_outline_rounded, color: medqurGreen, size: 16),
+                    SizedBox(width: 6),
+                    Text('Prototype data only', style: TextStyle(color: Color(0xFF8793A4), fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
                 ]),
               ),
-              const SizedBox(height: 34),
-              const FadeSlideIn(delay: Duration(milliseconds: 80), child: Text('Sign in for your shift', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: medqurInk, letterSpacing: -.8))),
-              const SizedBox(height: 10),
-              const FadeSlideIn(delay: Duration(milliseconds: 120), child: Text('Use your Medqur staff ID and device authentication. Your ID is an identifier, not your password.', style: TextStyle(fontSize: 15, height: 1.45, color: Color(0xFF65748A)))),
-              const SizedBox(height: 28),
-              TextField(
-                controller: _controller,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(labelText: 'Staff ID', prefixIcon: Icon(Icons.badge_outlined), hintText: 'MQ-7K4P-92XF'),
-              ),
-              const SizedBox(height: 14),
-              SegmentedButton<StaffRole>(
-                segments: const [
-                  ButtonSegment(value: StaffRole.doctor, icon: Icon(Icons.medical_services_outlined), label: Text('Doctor demo')),
-                  ButtonSegment(value: StaffRole.nurse, icon: Icon(Icons.medical_services_outlined), label: Text('Nurse demo')),
-                ],
-                selected: {_role},
-                onSelectionChanged: (value) {
-                  setState(() {
-                    _role = value.first;
-                    _controller.text = _role == StaffRole.doctor ? 'MQ-7K4P-92XF' : 'MQ-2N8R-41KD';
-                  });
-                },
-                style: SegmentedButton.styleFrom(minimumSize: const Size(0, 48), selectedBackgroundColor: const Color(0xFFEAF2FF), selectedForegroundColor: medqurBlue),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: _authenticating ? null : _signIn,
-                icon: _authenticating ? const SizedBox(width: 19, height: 19, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white)) : const Icon(Icons.fingerprint_rounded),
-                label: Text(_authenticating ? 'Authenticating…' : 'Continue with device authentication'),
-              ),
-              const SizedBox(height: 18),
-              const Row(children: [Expanded(child: Divider(color: medqurLine)), Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: TextStyle(color: Color(0xFF8390A2)))), Expanded(child: Divider(color: medqurLine))]),
-              const SizedBox(height: 18),
-              OutlinedButton.icon(
-                onPressed: _signIn,
-                icon: const Icon(Icons.qr_code_scanner_rounded),
-                label: const Text('Scan staff badge'),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52), side: const BorderSide(color: medqurLine), foregroundColor: medqurInk, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              ),
-              const SizedBox(height: 24),
-              const Text('Demo authentication only. Production would use passkeys / device biometrics and Ministry-approved identity controls.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8793A4), fontSize: 12, height: 1.4)),
-            ],
-          ),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../app_assets.dart';
 import '../models.dart';
 
@@ -11,16 +12,73 @@ const medqurGreen = Color(0xFF0F9D73);
 const medqurAmber = Color(0xFFF4A51C);
 const medqurRed = Color(0xFFD83A4D);
 
+/// Browser-safe vector wordmark. It intentionally does not use the old raster
+/// wordmark, which carried a baked grey background on some browsers.
 class MedqurLogo extends StatelessWidget {
   const MedqurLogo({super.key, this.width = 210});
   final double width;
+
   @override
-  Widget build(BuildContext context) => Image.asset(
-        AppAssets.medqurLogo,
-        width: width,
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: width * .29,
+      child: FittedBox(
+        alignment: Alignment.centerLeft,
         fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(width: 78, height: 62, child: CustomPaint(painter: _MedqurMarkPainter())),
+            const SizedBox(width: 4),
+            const Text(
+              'edqur',
+              style: TextStyle(
+                color: medqurNavy,
+                fontSize: 58,
+                fontWeight: FontWeight.w400,
+                letterSpacing: -2.6,
+                height: 1,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 6, bottom: 31),
+              child: Text('TM', style: TextStyle(color: medqurNavy, fontSize: 13, fontWeight: FontWeight.w900)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MedqurMarkPainter extends CustomPainter {
+  const _MedqurMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = medqurBlue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * .115
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path()
+      ..moveTo(size.width * .13, size.height * .18)
+      ..lineTo(size.width * .13, size.height * .82)
+      ..quadraticBezierTo(size.width * .13, size.height * .90, size.width * .22, size.height * .90)
+      ..lineTo(size.width * .78, size.height * .90)
+      ..quadraticBezierTo(size.width * .87, size.height * .90, size.width * .87, size.height * .82)
+      ..lineTo(size.width * .87, size.height * .18)
+      ..lineTo(size.width * .54, size.height * .55)
+      ..quadraticBezierTo(size.width * .50, size.height * .60, size.width * .46, size.height * .55)
+      ..lineTo(size.width * .13, size.height * .18);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class MinistryLogo extends StatelessWidget {
@@ -33,17 +91,16 @@ class MinistryLogo extends StatelessWidget {
         height: size,
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => SizedBox(
+          width: size,
+          height: size,
+          child: const Icon(Icons.health_and_safety_rounded, color: medqurGreen),
+        ),
       );
 }
 
 class SoftCard extends StatelessWidget {
-  const SoftCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(18),
-    this.onTap,
-    this.highlighted = false,
-  });
+  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.onTap, this.highlighted = false});
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
@@ -58,21 +115,13 @@ class SoftCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: highlighted ? medqurBlue.withValues(alpha: .55) : medqurLine,
-          width: highlighted ? 1.5 : 1,
-        ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0A173F8A), blurRadius: 22, offset: Offset(0, 8)),
-        ],
+        border: Border.all(color: highlighted ? medqurBlue.withValues(alpha: .55) : medqurLine, width: highlighted ? 1.5 : 1),
+        boxShadow: const [BoxShadow(color: Color(0x0A173F8A), blurRadius: 22, offset: Offset(0, 8))],
       ),
       child: child,
     );
     if (onTap == null) return card;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(borderRadius: BorderRadius.circular(22), onTap: onTap, child: card),
-    );
+    return Material(color: Colors.transparent, child: InkWell(borderRadius: BorderRadius.circular(22), onTap: onTap, child: card));
   }
 }
 
@@ -81,20 +130,10 @@ class SectionTitle extends StatelessWidget {
   final String title;
   final Widget? trailing;
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: medqurInk,
-                  ),
-            ),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      );
+  Widget build(BuildContext context) => Row(children: [
+        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: medqurInk))),
+        if (trailing != null) trailing!,
+      ]);
 }
 
 class StatusPill extends StatelessWidget {
@@ -105,63 +144,35 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .10),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 5),
-            ],
-            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800)),
-          ],
-        ),
+        decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(999)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[Icon(icon, size: 14, color: color), const SizedBox(width: 5)],
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800)),
+        ]),
       );
 }
 
-Color triageColor(TriageLevel level) {
-  switch (level) {
-    case TriageLevel.critical:
-      return medqurRed;
-    case TriageLevel.urgent:
-      return const Color(0xFFE46A25);
-    case TriageLevel.moderate:
-      return medqurAmber;
-    case TriageLevel.routine:
-      return medqurGreen;
-  }
-}
+Color triageColor(TriageLevel level) => switch (level) {
+      TriageLevel.critical => medqurRed,
+      TriageLevel.urgent => const Color(0xFFE46A25),
+      TriageLevel.moderate => medqurAmber,
+      TriageLevel.routine => medqurGreen,
+    };
 
-String triageLabel(TriageLevel level) {
-  switch (level) {
-    case TriageLevel.critical:
-      return 'Critical';
-    case TriageLevel.urgent:
-      return 'Urgent';
-    case TriageLevel.moderate:
-      return 'Moderate';
-    case TriageLevel.routine:
-      return 'Routine';
-  }
-}
+String triageLabel(TriageLevel level) => switch (level) {
+      TriageLevel.critical => 'Critical',
+      TriageLevel.urgent => 'Urgent',
+      TriageLevel.moderate => 'Moderate',
+      TriageLevel.routine => 'Routine',
+    };
 
-String patientStatusLabel(PatientStatus status) {
-  switch (status) {
-    case PatientStatus.waiting:
-      return 'Waiting';
-    case PatientStatus.triaged:
-      return 'Triaged';
-    case PatientStatus.withDoctor:
-      return 'With doctor';
-    case PatientStatus.treatment:
-      return 'Treatment';
-    case PatientStatus.discharge:
-      return 'Discharge';
-  }
-}
+String patientStatusLabel(PatientStatus status) => switch (status) {
+      PatientStatus.waiting => 'Waiting',
+      PatientStatus.triaged => 'Triaged',
+      PatientStatus.withDoctor => 'With doctor',
+      PatientStatus.treatment => 'Treatment',
+      PatientStatus.discharge => 'Discharge',
+    };
 
 class FadeSlideIn extends StatelessWidget {
   const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero});
@@ -170,44 +181,29 @@ class FadeSlideIn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
-        duration: Duration(milliseconds: 420 + delay.inMilliseconds),
+        duration: Duration(milliseconds: 360 + delay.inMilliseconds),
         curve: Curves.easeOutCubic,
         builder: (context, value, _) {
           final delayed = delay.inMilliseconds == 0
               ? value
-              : ((value * (420 + delay.inMilliseconds) - delay.inMilliseconds) / 420)
-                  .clamp(0.0, 1.0);
-          return Opacity(
-            opacity: delayed,
-            child: Transform.translate(offset: Offset(0, 12 * (1 - delayed)), child: child),
-          );
+              : ((value * (360 + delay.inMilliseconds) - delay.inMilliseconds) / 360).clamp(0.0, 1.0);
+          return Opacity(opacity: delayed, child: Transform.translate(offset: Offset(0, 9 * (1 - delayed)), child: child));
         },
       );
 }
 
+/// Kept under the original class name so V0.1 screens remain source-compatible,
+/// but this now renders an actual, scannable QR code.
 class FakeQr extends StatelessWidget {
-  const FakeQr({super.key, this.size = 88});
+  const FakeQr({super.key, this.size = 88, this.data = 'medqur://prototype'});
   final double size;
+  final String data;
   @override
-  Widget build(BuildContext context) {
-    const pattern = [
-      1,1,1,1,0,1,0,1,1,1,1, 1,0,0,1,1,0,1,1,0,0,1,
-      1,0,1,1,0,1,0,1,1,0,1, 1,1,1,0,1,0,1,0,1,1,1,
-      0,1,0,1,1,1,0,1,0,1,0, 1,0,1,0,1,0,1,1,1,0,1,
-      0,1,1,1,0,1,0,0,1,1,0, 1,1,0,1,1,0,1,1,0,1,1,
-      1,0,1,0,1,1,0,1,1,0,1, 1,0,0,1,0,1,1,0,0,1,1,
-      1,1,1,1,0,1,0,1,1,1,1,
-    ];
-    return SizedBox(
-      width: size,
-      height: size,
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        itemCount: 121,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 11),
-        itemBuilder: (_, i) => ColoredBox(color: pattern[i] == 1 ? medqurInk : Colors.white),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => QrImageView(
+        data: data,
+        version: QrVersions.auto,
+        size: size,
+        padding: const EdgeInsets.all(4),
+        backgroundColor: Colors.white,
+      );
 }
