@@ -124,3 +124,51 @@ jobs:
           name: Medqur-iOS-Unsigned
           path: Medqur-iOS-unsigned.zip
           if-no-files-found: error
+
+  release-downloads:
+    name: Publish easy downloads
+    needs: [android-and-web, ios]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android build
+        uses: actions/download-artifact@v4
+        with:
+          name: Medqur-Android-APK
+          path: release/android
+
+      - name: Download iOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: Medqur-iOS-Unsigned
+          path: release/ios
+
+      - name: Prepare download files
+        shell: bash
+        run: |
+          mv release/android/app-release.apk release/Medqur-Android.apk
+          mv release/ios/Medqur-iOS-unsigned.zip release/Medqur-iOS-Unsigned.zip
+          cat > release/RELEASE_NOTES.md <<'EOF'
+          # Medqur latest build
+
+          Easy download copies of the latest successful Medqur build from `main`.
+
+          - **Medqur-Android.apk** — Android release APK.
+          - **Medqur-iOS-Unsigned.zip** — unsigned iOS `Runner.app` package. It is not an App Store/TestFlight-signed IPA and cannot be installed normally on an iPhone until it is code-signed.
+
+          This is a prototype build and does not connect to production NIDS, Ministry of Health, or e-Care services.
+          EOF
+
+      - name: Replace latest GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release delete medqur-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
+          gh release create medqur-latest \
+            release/Medqur-Android.apk \
+            release/Medqur-iOS-Unsigned.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Medqur Latest Build" \
+            --notes-file release/RELEASE_NOTES.md
