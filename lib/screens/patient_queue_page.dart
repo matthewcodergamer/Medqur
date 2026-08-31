@@ -8,11 +8,13 @@ class PatientQueuePage extends StatelessWidget {
     required this.staff,
     required this.patients,
     required this.onOpenPatient,
+    required this.onNewEncounter,
   });
 
   final StaffProfile staff;
   final List<Patient> patients;
   final ValueChanged<Patient> onOpenPatient;
+  final VoidCallback onNewEncounter;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,7 @@ class PatientQueuePage extends StatelessWidget {
                 ),
               ),
               FilledButton.tonalIcon(
-                onPressed: () {},
+                onPressed: onNewEncounter,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('New encounter'),
               ),
