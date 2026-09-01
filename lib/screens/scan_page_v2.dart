@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models.dart';
+import '../services/nids_test_credential.dart';
 import '../widgets/common.dart';
 import 'live_scanner_page.dart';
+import 'nids_test_credential_page.dart';
 
 class ScanPageV2 extends StatefulWidget {
   const ScanPageV2({super.key, required this.patients, required this.onOpenPatient});
@@ -16,12 +18,14 @@ class _ScanPageV2State extends State<ScanPageV2> {
   ScanPurpose purpose = ScanPurpose.patientWristband;
   ScanCapture? capture;
   Patient? matchedPatient;
+  NidsTestCredential? nidsTestCredential;
   String? message;
 
   Future<void> _scan() async {
     final result = await Navigator.of(context).push<ScanCapture>(MaterialPageRoute(builder: (_) => LiveScannerPage(purpose: purpose)));
     if (result == null || !mounted) return;
     Patient? match;
+    NidsTestCredential? nidsTest;
     String status;
     if (purpose == ScanPurpose.patientWristband) {
       match = _findEncounter(result.value);
@@ -30,13 +34,17 @@ class _ScanPageV2State extends State<ScanPageV2> {
       match = _findMedication(result.value);
       status = match == null ? 'Barcode captured. It is not mapped to an active medication order here.' : 'Medication barcode matched an active order.';
     } else if (purpose == ScanPurpose.nidsCard) {
-      status = 'Credential captured. NIRA verification is not connected to this public prototype.';
+      nidsTest = NidsTestCredential.tryParse(result.value);
+      status = nidsTest == null
+          ? 'Identity code captured, but it is not a Medqur NIDS TEST credential. NIRA verification is not connected.'
+          : 'Medqur NIDS TEST credential decoded successfully.';
     } else {
       status = 'Staff credential captured.';
     }
     setState(() {
       capture = result;
       matchedPatient = match;
+      nidsTestCredential = nidsTest;
       message = status;
     });
   }
@@ -57,6 +65,10 @@ class _ScanPageV2State extends State<ScanPageV2> {
     return null;
   }
 
+  Future<void> _openGenerator() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NidsTestCredentialPage()));
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -74,18 +86,45 @@ class _ScanPageV2State extends State<ScanPageV2> {
         ]),
         const SizedBox(height: 18),
         FilledButton.icon(onPressed: _scan, icon: const Icon(Icons.camera_alt_rounded), label: Text(purpose.title)),
+        if (purpose == ScanPurpose.nidsCard) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _openGenerator,
+            icon: const Icon(Icons.qr_code_2_rounded),
+            label: const Text('Create a NIDS test QR'),
+          ),
+        ],
         const SizedBox(height: 18),
         if (capture != null)
           SoftCard(
-            highlighted: matchedPatient != null,
+            highlighted: matchedPatient != null || nidsTestCredential != null,
             onTap: matchedPatient == null ? null : () => widget.onOpenPatient(matchedPatient!),
             child: Row(children: [
-              Icon(matchedPatient != null ? Icons.verified_rounded : Icons.qr_code_rounded, color: matchedPatient != null ? medqurGreen : medqurBlue),
+              Icon(
+                matchedPatient != null || nidsTestCredential != null ? Icons.verified_rounded : Icons.qr_code_rounded,
+                color: matchedPatient != null || nidsTestCredential != null ? medqurGreen : medqurBlue,
+              ),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(message ?? 'Captured', style: TextStyle(color: matchedPatient != null ? medqurGreen : medqurInk, fontWeight: FontWeight.w800)),
+                Text(
+                  message ?? 'Captured',
+                  style: TextStyle(
+                    color: matchedPatient != null || nidsTestCredential != null ? medqurGreen : medqurInk,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 5),
-                Text(matchedPatient?.name ?? capture!.value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF65748A), fontSize: 12)),
+                if (nidsTestCredential != null) ...[
+                  Text(nidsTestCredential!.fullName, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text(
+                    'DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}',
+                    style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text('TEST ONLY • not NIRA verified', style: TextStyle(color: medqurRed, fontSize: 10, fontWeight: FontWeight.w800)),
+                ] else
+                  Text(matchedPatient?.name ?? capture!.value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF65748A), fontSize: 12)),
                 const SizedBox(height: 3),
                 Text(capture!.format.name, style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11)),
               ])),
@@ -93,7 +132,7 @@ class _ScanPageV2State extends State<ScanPageV2> {
             ]),
           ),
         const SizedBox(height: 18),
-        const SoftCard(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.info_outline_rounded, color: medqurBlue), SizedBox(width: 12), Expanded(child: Text('The scanner accepts QR codes and standard package barcodes. A production medication match must come from an approved drug/product master, not from the barcode alone.'))])),
+        const SoftCard(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.info_outline_rounded, color: medqurBlue), SizedBox(width: 12), Expanded(child: Text('The scanner accepts QR codes and standard package barcodes. NIDS TEST QRs are self-contained prototype data only; production identity must be verified by an approved NIRA integration. Medication matches must use an approved drug/product master.'))])),
       ],
     );
   }
@@ -102,6 +141,7 @@ class _ScanPageV2State extends State<ScanPageV2> {
         purpose = value;
         capture = null;
         matchedPatient = null;
+        nidsTestCredential = null;
         message = null;
       }));
 }
