@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Configure generated Flutter platforms for Medqur V0.2.
+"""Configure generated Flutter platforms for Medqur.
 
 The repository intentionally generates platform scaffolding in CI. This script
-adds the permissions/native auth setup and creates branded raster app icons from
-the same geometry as assets/medqur_app_icon.svg.
+adds permissions/native auth/printing setup and creates branded raster app icons
+from the same geometry as assets/medqur_app_icon.svg.
 """
 from __future__ import annotations
 
@@ -40,7 +40,6 @@ def icon(size: int) -> Image.Image:
     radius = width // 2
     for x, y in (pts[0], pts[1], pts[2], pts[3]):
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=BLUE)
-    # Redraw the line so the rounded caps do not hide the joined shape.
     draw.line(pts, fill=BLUE, width=width, joint="curve")
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
@@ -112,6 +111,8 @@ def configure_ios() -> None:
             text = re.sub(r"platform :ios, '[^']+'", "platform :ios, '13.0'", text)
         else:
             text = "platform :ios, '13.0'\n" + text
+        if "use_frameworks!" not in text:
+            text = text.replace("target 'Runner' do", "target 'Runner' do\n  use_frameworks!", 1)
         podfile.write_text(text, encoding="utf-8")
 
     project = ios / "Runner.xcodeproj/project.pbxproj"
@@ -169,7 +170,7 @@ def main() -> None:
     configure_android()
     configure_ios()
     configure_web()
-    print("Configured Medqur V0.2 platform permissions, native auth, and icons.")
+    print("Configured Medqur platform permissions, native auth, printing, and icons.")
 
 
 if __name__ == "__main__":
