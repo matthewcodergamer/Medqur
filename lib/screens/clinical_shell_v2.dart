@@ -180,7 +180,7 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Active shift • V0.4 • ${widget.facility.classification.shortLabel} • P1–P4 triage',
+                  'Active shift • V0.5 • ${widget.facility.classification.shortLabel} • P1–P4 triage',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF78869A), fontSize: 11),
