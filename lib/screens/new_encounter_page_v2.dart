@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models.dart';
+import '../services/nids_test_credential.dart';
 import '../widgets/common.dart';
 import 'live_scanner_page.dart';
 
@@ -18,6 +19,7 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
   String sex = 'Male';
   TriageLevel triage = TriageLevel.moderate;
   String? capturedCredential;
+  NidsTestCredential? nidsTestCredential;
   int stage = 0;
 
   @override
@@ -33,7 +35,16 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
       MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.nidsCard)),
     );
     if (capture == null || !mounted) return;
-    setState(() => capturedCredential = capture.value);
+
+    final parsed = NidsTestCredential.tryParse(capture.value);
+    if (parsed != null) {
+      name.text = parsed.fullName;
+      age.text = NidsTestCredential.ageFromIsoDate(parsed.dateOfBirth).toString();
+    }
+    setState(() {
+      capturedCredential = capture.value;
+      nidsTestCredential = parsed;
+    });
   }
 
   String _shortId() =>
@@ -54,9 +65,11 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
           ? 'Temporary emergency identity'
           : visitor
               ? 'Visitor credential captured'
-              : capturedCredential == null
-                  ? 'NIDS verification pending'
-                  : 'NIDS credential captured',
+              : nidsTestCredential != null
+                  ? 'Medqur NIDS test credential captured • not NIRA verified'
+                  : capturedCredential == null
+                      ? 'NIDS verification pending'
+                      : 'Identity credential captured • authoritative verification pending',
       chiefComplaint: complaint.text.trim().isEmpty
           ? 'Clinical complaint pending'
           : complaint.text.trim(),
@@ -72,11 +85,15 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
       allergies: const ['No known allergies'],
       timeline: [
         '${_timeNow()} — ${emergency ? 'Emergency identity created' : 'Encounter registration started'}',
-        if (capturedCredential != null)
+        if (nidsTestCredential != null)
+          '${_timeNow()} — Medqur NIDS TEST QR decoded: name, DOB and TEST NIN prefilled; NIRA verification not performed'
+        else if (capturedCredential != null)
           '${_timeNow()} — Identity credential scanned; authoritative verification still pending',
         '${_timeNow()} — ${triageCode(triage)} (${triageName(triage)}) triage recorded',
       ],
       medications: [],
+      dateOfBirth: nidsTestCredential?.dateOfBirth,
+      nationalIdNumber: nidsTestCredential?.nationalIdNumber,
     );
   }
 
@@ -102,7 +119,7 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
 
   Widget _registration() {
     return ListView(
-      key: const ValueKey('registration-v3'),
+      key: const ValueKey('registration-v5'),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
       children: [
         Text('Identify patient', style: Theme.of(context).textTheme.headlineSmall),
@@ -118,6 +135,7 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
                 onSelected: (_) => setState(() {
                   identity = item;
                   capturedCredential = null;
+                  nidsTestCredential = null;
                 }),
               ),
           ],
@@ -126,16 +144,34 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
         if (identity == 'NIDS / NIC') ...[
           OutlinedButton.icon(
             onPressed: _scanIdentity,
-            icon: const Icon(Icons.badge_outlined),
+            icon: const Icon(Icons.qr_code_scanner_rounded),
             label: Text(capturedCredential == null
-                ? 'Scan NIDS / NIC'
+                ? 'Scan NIDS / NIC code'
                 : 'Credential captured • scan again'),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Scanning captures the credential only. NIRA identity verification is not connected to this public prototype.',
-            style: TextStyle(color: Color(0xFF748297), fontSize: 12),
-          ),
+          if (nidsTestCredential != null)
+            SoftCard(
+              highlighted: true,
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.verified_outlined, color: medqurGreen),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Medqur test credential decoded', style: TextStyle(color: medqurGreen, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 5),
+                  Text(nidsTestCredential!.fullName, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text('DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}', style: const TextStyle(color: Color(0xFF65748A), fontSize: 12)),
+                  const SizedBox(height: 5),
+                  const Text('TEST ONLY — this prefills the prototype form. It is not NIRA identity verification.', style: TextStyle(color: medqurRed, fontSize: 11, fontWeight: FontWeight.w800)),
+                ])),
+              ]),
+            )
+          else
+            const Text(
+              'The prototype can decode a Medqur NIDS TEST QR. Real NIRA identity verification is not connected and must use an approved production interface.',
+              style: TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.4),
+            ),
           const SizedBox(height: 14),
         ],
         if (identity != 'Emergency / unknown') ...[
@@ -255,7 +291,7 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
   Widget _wristband() {
     final patient = _patient();
     return ListView(
-      key: const ValueKey('wristband-v3'),
+      key: const ValueKey('wristband-v5'),
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
       children: [
         const Center(child: Icon(Icons.check_circle_rounded, color: medqurGreen, size: 52)),
@@ -303,7 +339,9 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          patient.id,
+                          patient.dateOfBirth == null
+                              ? patient.id
+                              : '${patient.id} • DOB ${patient.dateOfBirth}',
                           style: const TextStyle(
                             color: Color(0xFF65748A),
                             fontWeight: FontWeight.w700,
@@ -331,7 +369,7 @@ class _NewEncounterPageV2State extends State<NewEncounterPageV2> {
                 const Divider(color: medqurLine),
                 const SizedBox(height: 8),
                 const Text(
-                  'The QR contains only an opaque encounter token, not diagnoses or confidential clinical data.',
+                  'The wristband QR contains only the Medqur encounter token. It does not contain the NIDS number, diagnosis or medication list.',
                   style: TextStyle(color: Color(0xFF748297), fontSize: 12),
                 ),
               ]),
