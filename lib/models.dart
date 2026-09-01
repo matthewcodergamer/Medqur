@@ -103,7 +103,8 @@ extension FacilityClassInfo on FacilityClass {
         FacilityClass.type4HealthCentre ||
         FacilityClass.type5HealthCentre =>
           'Primary-care entry point; refer or transfer patients who need hospital-level emergency, inpatient or specialist services.',
-        FacilityClass.other => 'Referral pathway depends on the facility’s approved service scope.',
+        FacilityClass.other =>
+          'Referral pathway depends on the facility’s approved service scope.',
       };
 
   bool get isHospital => switch (this) {
@@ -141,7 +142,8 @@ class StaffProfile {
   final String registration;
   final List<Facility> facilities;
 
-  String get badgeToken => 'medqur://staff/$id';
+  /// Short QR token: fewer modules than the legacy medqur://staff URI.
+  String get badgeToken => 'MQS|$id';
 }
 
 class Facility {
@@ -195,7 +197,11 @@ class MedicationOrder {
   final bool administered;
   final String? productCode;
 
-  MedicationOrder copyWith({bool? administered, String? productCode}) => MedicationOrder(
+  MedicationOrder copyWith({
+    bool? administered,
+    String? productCode,
+  }) =>
+      MedicationOrder(
         name: name,
         dose: dose,
         route: route,
@@ -215,7 +221,8 @@ class MedicationOrder {
         'productCode': productCode,
       };
 
-  factory MedicationOrder.fromJson(Map<String, dynamic> json) => MedicationOrder(
+  factory MedicationOrder.fromJson(Map<String, dynamic> json) =>
+      MedicationOrder(
         name: json['name']?.toString() ?? '',
         dose: json['dose']?.toString() ?? '',
         route: json['route']?.toString() ?? '',
@@ -270,9 +277,12 @@ class Patient {
   String? assignedStaffName;
 
   String get effectiveEncounterId =>
-      encounterId == null || encounterId!.trim().isEmpty ? 'ENC-$id' : encounterId!;
+      encounterId == null || encounterId!.trim().isEmpty
+          ? 'ENC-$id'
+          : encounterId!;
 
-  String get encounterToken => 'medqur://encounter/$effectiveEncounterId';
+  /// Short QR token: the printed code does not contain patient/clinical data.
+  String get encounterToken => 'MQE|$effectiveEncounterId';
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -306,12 +316,23 @@ class Patient {
       sex: json['sex']?.toString() ?? 'Unknown',
       nidsStatus: json['nidsStatus']?.toString() ?? 'Identity pending',
       chiefComplaint: json['chiefComplaint']?.toString() ?? '',
-      triage: TriageLevel.values.firstWhere((item) => item.name == triageName, orElse: () => TriageLevel.routine),
-      status: PatientStatus.values.firstWhere((item) => item.name == statusName, orElse: () => PatientStatus.waiting),
+      triage: TriageLevel.values.firstWhere(
+        (item) => item.name == triageName,
+        orElse: () => TriageLevel.routine,
+      ),
+      status: PatientStatus.values.firstWhere(
+        (item) => item.name == statusName,
+        orElse: () => PatientStatus.waiting,
+      ),
       waitMinutes: (json['waitMinutes'] as num?)?.toInt() ?? 0,
-      vitals: (json['vitals'] as Map<String, dynamic>? ?? {}).map((key, value) => MapEntry(key, value.toString())),
-      allergies: (json['allergies'] as List<dynamic>? ?? []).map((item) => item.toString()).toList(),
-      timeline: (json['timeline'] as List<dynamic>? ?? []).map((item) => item.toString()).toList(),
+      vitals: (json['vitals'] as Map<String, dynamic>? ?? {})
+          .map((key, value) => MapEntry(key, value.toString())),
+      allergies: (json['allergies'] as List<dynamic>? ?? [])
+          .map((item) => item.toString())
+          .toList(),
+      timeline: (json['timeline'] as List<dynamic>? ?? [])
+          .map((item) => item.toString())
+          .toList(),
       medications: (json['medications'] as List<dynamic>? ?? [])
           .map((item) => MedicationOrder.fromJson(item as Map<String, dynamic>))
           .toList(),
