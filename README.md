@@ -1,10 +1,32 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.2 focuses on real device interaction while keeping government/EHR integrations explicitly simulated until approved backend interfaces exist.
+Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.3 adds a Jamaica-focused P1–P4 emergency triage workflow on top of the V0.2 camera, biometric, wristband and medication-scanning foundation.
 
-> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, medication administration or storage of protected health information.
+> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, triage, medication administration or storage of protected health information. Any production P1–P4 rules, routing targets and clinical language must be formally validated and governed by Jamaica's Ministry of Health & Wellness and participating facilities.
 
-## V0.2
+## V0.3 — P1–P4 emergency triage
+
+Medqur now presents the emergency priority levels directly in the encounter workflow and patient queue:
+
+- **P1 • Critical** — life-threatening emergency requiring immediate life-saving intervention; route directly to resuscitation.
+- **P2 • Emergent** — severe or potentially life-threatening condition requiring rapid medical assessment and urgent treatment; route to a priority treatment area.
+- **P3 • Intermediate** — stable, more complicated condition requiring medical care that can be delayed safely for a reasonable period, with reassessment while waiting.
+- **P4 • Fast track** — minor, non-acute or routine presentation appropriate for fast-track care and the lowest emergency queue priority.
+
+### Triage workflow changes
+
+- New encounters use four large P1–P4 selection cards instead of generic Critical/Urgent/Moderate/Routine chips.
+- Each priority shows a short acuity description and routing action before the nurse confirms it.
+- P1 and P2 selections produce a prominent routing warning so they are not treated like routine waiting cases.
+- Patient wristbands show the P-level and clinical label.
+- Patient cards throughout the app inherit P1–P4 labels from the central triage helpers.
+- The active patient queue is ordered **P1 → P2 → P3 → P4**.
+- The queue dashboard shows a live count for every P-level and an additional P1/P2 urgency notice when high-priority patients are active.
+- Existing stored V0.2 prototype records remain compatible because the internal persisted enum names were intentionally left unchanged.
+
+Triage classification remains a clinician-entered decision. The prototype does not attempt to diagnose a patient or automatically assign a P-level from symptoms or vital signs.
+
+## V0.2 foundation retained
 
 ### Real device functionality
 
@@ -30,7 +52,7 @@ Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.2 f
 - production cross-device realtime backend
 - production clinical database or audit service
 
-The browser build can use the camera, but secure browser passkeys require a server-generated WebAuthn challenge. V0.2 does not fake that security step; the web sign-in is clearly marked as prototype access.
+The browser build can use the camera, but secure browser passkeys require a server-generated WebAuthn challenge. The public web build does not fake that security step.
 
 ## Medication identification
 
@@ -55,7 +77,7 @@ GitHub Actions regenerates the Flutter platform scaffolding, adds camera/biometr
 - Flutter web release + `gh-pages`
 - unsigned iOS release app
 
-The V0.2 workflow is the release gate for every push to `main`.
+The workflow is the release gate for every push to `main`.
 
 See `.github/workflows/build.yml`.
 
