@@ -30,7 +30,11 @@ class MedqurLogo extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(width: 78, height: 62, child: CustomPaint(painter: _MedqurMarkPainter())),
+            const SizedBox(
+              width: 78,
+              height: 62,
+              child: CustomPaint(painter: _MedqurMarkPainter()),
+            ),
             const SizedBox(width: 4),
             const Text(
               'edqur',
@@ -44,7 +48,14 @@ class MedqurLogo extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.only(left: 6, bottom: 31),
-              child: Text('TM', style: TextStyle(color: medqurNavy, fontSize: 13, fontWeight: FontWeight.w900)),
+              child: Text(
+                'TM',
+                style: TextStyle(
+                  color: medqurNavy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ],
         ),
@@ -67,12 +78,27 @@ class _MedqurMarkPainter extends CustomPainter {
     final path = Path()
       ..moveTo(size.width * .13, size.height * .18)
       ..lineTo(size.width * .13, size.height * .82)
-      ..quadraticBezierTo(size.width * .13, size.height * .90, size.width * .22, size.height * .90)
+      ..quadraticBezierTo(
+        size.width * .13,
+        size.height * .90,
+        size.width * .22,
+        size.height * .90,
+      )
       ..lineTo(size.width * .78, size.height * .90)
-      ..quadraticBezierTo(size.width * .87, size.height * .90, size.width * .87, size.height * .82)
+      ..quadraticBezierTo(
+        size.width * .87,
+        size.height * .90,
+        size.width * .87,
+        size.height * .82,
+      )
       ..lineTo(size.width * .87, size.height * .18)
       ..lineTo(size.width * .54, size.height * .55)
-      ..quadraticBezierTo(size.width * .50, size.height * .60, size.width * .46, size.height * .55)
+      ..quadraticBezierTo(
+        size.width * .50,
+        size.height * .60,
+        size.width * .46,
+        size.height * .55,
+      )
       ..lineTo(size.width * .13, size.height * .18);
     canvas.drawPath(path, paint);
   }
@@ -81,27 +107,55 @@ class _MedqurMarkPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+/// The Ministry artwork in assets/ministry_health_logo.png is a wide wordmark,
+/// not a square icon. `width` renders that full wordmark at its natural aspect
+/// ratio. `size` is retained for source compatibility with older call sites.
 class MinistryLogo extends StatelessWidget {
-  const MinistryLogo({super.key, this.size = 58});
+  const MinistryLogo({
+    super.key,
+    this.size = 58,
+    this.width,
+  });
+
   final double size;
+  final double? width;
 
   @override
-  Widget build(BuildContext context) => Image.asset(
+  Widget build(BuildContext context) {
+    final resolvedWidth = width ?? size;
+    final resolvedHeight = width == null ? size : resolvedWidth / 2.82;
+
+    return SizedBox(
+      width: resolvedWidth,
+      height: resolvedHeight,
+      child: Image.asset(
         AppAssets.ministryLogo,
-        width: size,
-        height: size,
         fit: BoxFit.contain,
+        alignment: Alignment.centerLeft,
         filterQuality: FilterQuality.high,
-        errorBuilder: (_, __, ___) => SizedBox(
-          width: size,
-          height: size,
-          child: const Icon(Icons.health_and_safety_rounded, color: medqurGreen),
+        isAntiAlias: true,
+        errorBuilder: (_, __, ___) => Align(
+          alignment: Alignment.centerLeft,
+          child: Icon(
+            Icons.health_and_safety_rounded,
+            color: medqurGreen,
+            size: resolvedHeight * .72,
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class SoftCard extends StatelessWidget {
-  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.onTap, this.highlighted = false});
+  const SoftCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(18),
+    this.onTap,
+    this.highlighted = false,
+  });
+
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
@@ -117,17 +171,29 @@ class SoftCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: highlighted ? medqurBlue.withValues(alpha: .55) : medqurLine,
+          color: highlighted
+              ? medqurBlue.withValues(alpha: .55)
+              : medqurLine,
           width: highlighted ? 1.5 : 1,
         ),
-        boxShadow: const [BoxShadow(color: Color(0x0A173F8A), blurRadius: 22, offset: Offset(0, 8))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A173F8A),
+            blurRadius: 22,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: child,
     );
     if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(borderRadius: BorderRadius.circular(22), onTap: onTap, child: card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: card,
+      ),
     );
   }
 }
@@ -138,19 +204,30 @@ class SectionTitle extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: medqurInk),
+  Widget build(BuildContext context) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: medqurInk,
+                  ),
+            ),
           ),
-        ),
-        if (trailing != null) trailing!,
-      ]);
+          if (trailing != null) trailing!,
+        ],
+      );
 }
 
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.label, required this.color, this.icon});
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+  });
+
   final String label;
   final Color color;
   final IconData? icon;
@@ -158,11 +235,27 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(999)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (icon != null) ...[Icon(icon, size: 14, color: color), const SizedBox(width: 5)],
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800)),
-        ]),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -190,20 +283,29 @@ String triageName(TriageLevel level) => switch (level) {
       TriageLevel.routine => 'Fast track',
     };
 
-String triageLabel(TriageLevel level) => '${triageCode(level)} • ${triageName(level)}';
+String triageLabel(TriageLevel level) =>
+    '${triageCode(level)} • ${triageName(level)}';
 
 String triageDescription(TriageLevel level) => switch (level) {
-      TriageLevel.critical => 'Life-threatening emergency requiring immediate life-saving intervention.',
-      TriageLevel.urgent => 'Severe or potentially life-threatening condition requiring rapid assessment and urgent treatment.',
-      TriageLevel.moderate => 'Stable, intermediate condition requiring medical care that can be delayed safely for a reasonable period.',
-      TriageLevel.routine => 'Minor, non-acute or routine case appropriate for fast-track care.',
+      TriageLevel.critical =>
+        'Life-threatening emergency requiring immediate life-saving intervention.',
+      TriageLevel.urgent =>
+        'Severe or potentially life-threatening condition requiring rapid assessment and urgent treatment.',
+      TriageLevel.moderate =>
+        'Stable, intermediate condition requiring medical care that can be delayed safely for a reasonable period.',
+      TriageLevel.routine =>
+        'Minor, non-acute or routine case appropriate for fast-track care.',
     };
 
 String triageAction(TriageLevel level) => switch (level) {
-      TriageLevel.critical => 'Immediate • route directly to resuscitation',
-      TriageLevel.urgent => 'Urgent • route to priority treatment area',
-      TriageLevel.moderate => 'Care required • reassess while waiting',
-      TriageLevel.routine => 'Fast track • lowest emergency queue priority',
+      TriageLevel.critical =>
+        'Immediate • route directly to resuscitation',
+      TriageLevel.urgent =>
+        'Urgent • route to priority treatment area',
+      TriageLevel.moderate =>
+        'Care required • reassess while waiting',
+      TriageLevel.routine =>
+        'Fast track • lowest emergency queue priority',
     };
 
 bool triageBypassesRoutineWaiting(TriageLevel level) =>
@@ -218,7 +320,12 @@ String patientStatusLabel(PatientStatus status) => switch (status) {
     };
 
 class FadeSlideIn extends StatelessWidget {
-  const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero});
+  const FadeSlideIn({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+  });
+
   final Widget child;
   final Duration delay;
 
@@ -230,10 +337,16 @@ class FadeSlideIn extends StatelessWidget {
         builder: (context, value, _) {
           final delayed = delay.inMilliseconds == 0
               ? value
-              : ((value * (360 + delay.inMilliseconds) - delay.inMilliseconds) / 360).clamp(0.0, 1.0);
+              : ((value * (360 + delay.inMilliseconds) -
+                          delay.inMilliseconds) /
+                      360)
+                  .clamp(0.0, 1.0);
           return Opacity(
             opacity: delayed,
-            child: Transform.translate(offset: Offset(0, 9 * (1 - delayed)), child: child),
+            child: Transform.translate(
+              offset: Offset(0, 9 * (1 - delayed)),
+              child: child,
+            ),
           );
         },
       );
@@ -242,7 +355,12 @@ class FadeSlideIn extends StatelessWidget {
 /// Kept under the original class name so V0.1 screens remain source-compatible,
 /// but this renders an actual, scannable QR code.
 class FakeQr extends StatelessWidget {
-  const FakeQr({super.key, this.size = 88, this.data = 'medqur://prototype'});
+  const FakeQr({
+    super.key,
+    this.size = 88,
+    this.data = 'medqur://prototype',
+  });
+
   final double size;
   final String data;
 
