@@ -14,10 +14,10 @@ extension ScanPurposeLabel on ScanPurpose {
       };
 
   String get guidance => switch (this) {
-        ScanPurpose.staffBadge => 'Fit the staff badge inside the card outline.',
-        ScanPurpose.patientWristband => 'Place the wristband QR or barcode inside the square.',
-        ScanPurpose.nidsCard => 'Fit the identity card inside the card outline.',
-        ScanPurpose.medication => 'Place the package QR or barcode inside the scan area.',
+        ScanPurpose.staffBadge => 'Fit the whole staff badge inside the card outline and keep its code inside the blue code guide.',
+        ScanPurpose.patientWristband => 'Place the patient wristband QR or barcode inside the wide scan area.',
+        ScanPurpose.nidsCard => 'Show the back of the test card. Fit the whole card in frame and align its Medqur test QR with the blue code guide.',
+        ScanPurpose.medication => 'Place the package DataMatrix, QR, or barcode inside the scan area.',
       };
 }
 
@@ -150,15 +150,15 @@ class _ScanOverlayPainter extends CustomPainter {
     final width = switch (purpose) {
       ScanPurpose.staffBadge || ScanPurpose.nidsCard => size.width * .82,
       ScanPurpose.medication => size.width * .82,
-      ScanPurpose.patientWristband => size.shortestSide * .68,
+      ScanPurpose.patientWristband => size.width * .86,
     };
     final height = switch (purpose) {
       ScanPurpose.staffBadge || ScanPurpose.nidsCard => width / 1.58,
       ScanPurpose.medication => width * .42,
-      ScanPurpose.patientWristband => width,
+      ScanPurpose.patientWristband => width * .42,
     };
     final rect = Rect.fromCenter(center: center, width: width, height: height);
-    final frame = RRect.fromRectAndRadius(rect, Radius.circular(purpose == ScanPurpose.patientWristband ? 24 : 20));
+    final frame = RRect.fromRectAndRadius(rect, Radius.circular(purpose == ScanPurpose.patientWristband ? 18 : 20));
 
     final shade = Path()
       ..fillType = PathFillType.evenOdd
@@ -181,6 +181,32 @@ class _ScanOverlayPainter extends CustomPainter {
       final sy = pair[3];
       canvas.drawLine(Offset(x, y), Offset(x + corner * sx, y), accent);
       canvas.drawLine(Offset(x, y), Offset(x, y + corner * sy), accent);
+    }
+
+    if (purpose == ScanPurpose.staffBadge || purpose == ScanPurpose.nidsCard) {
+      final codeSize = rect.height * .42;
+      final codeRect = Rect.fromLTWH(
+        rect.right - codeSize - rect.width * .06,
+        rect.bottom - codeSize - rect.height * .08,
+        codeSize,
+        codeSize,
+      );
+      final codeRRect = RRect.fromRectAndRadius(codeRect, const Radius.circular(10));
+      canvas.drawRRect(
+        codeRRect,
+        Paint()
+          ..color = const Color(0xFF6EA2FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5,
+      );
+      final label = TextPainter(
+        text: const TextSpan(
+          text: 'CODE',
+          style: TextStyle(color: Color(0xFFBFD4FF), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, Offset(codeRect.left + (codeRect.width - label.width) / 2, codeRect.top - 18));
     }
   }
 
