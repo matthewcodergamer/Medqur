@@ -35,7 +35,10 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   List<_NavItem> get items => [
         const _NavItem('Patients', Icons.people_alt_outlined),
         const _NavItem('Scan', Icons.qr_code_scanner_rounded),
-        _NavItem(isDoctor ? 'Orders' : 'Tasks', isDoctor ? Icons.receipt_long_outlined : Icons.medical_services_outlined),
+        _NavItem(
+          isDoctor ? 'Orders' : 'Tasks',
+          isDoctor ? Icons.receipt_long_outlined : Icons.medical_services_outlined,
+        ),
         const _NavItem('Profile', Icons.badge_outlined),
       ];
 
@@ -45,11 +48,21 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   }
 
   void openPatient(Patient patient) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => PatientDetailPageV2(staff: widget.staff, patient: patient, onChanged: _patientChanged)));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PatientDetailPageV2(
+          staff: widget.staff,
+          patient: patient,
+          onChanged: _patientChanged,
+        ),
+      ),
+    );
   }
 
   Future<void> newEncounter() async {
-    final patient = await Navigator.of(context).push<Patient>(MaterialPageRoute(builder: (_) => const NewEncounterPageV2()));
+    final patient = await Navigator.of(context).push<Patient>(
+      MaterialPageRoute(builder: (_) => const NewEncounterPageV2()),
+    );
     if (patient == null || !mounted) return;
     setState(() => widget.patients.insert(0, patient));
     await widget.onPatientsChanged();
@@ -57,12 +70,21 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   }
 
   Widget page() => switch (index) {
-        0 => PatientQueuePage(staff: widget.staff, patients: widget.patients, onOpenPatient: openPatient, onNewEncounter: newEncounter),
+        0 => PatientQueuePage(
+            staff: widget.staff,
+            patients: widget.patients,
+            onOpenPatient: openPatient,
+            onNewEncounter: newEncounter,
+          ),
         1 => ScanPageV2(patients: widget.patients, onOpenPatient: openPatient),
         2 => isDoctor
             ? OrdersPage(patients: widget.patients, onOpenPatient: openPatient)
             : NurseTasksPage(patients: widget.patients, onOpenPatient: openPatient),
-        _ => ProfilePageV2(staff: widget.staff, facility: widget.facility, onEndShift: widget.onEndShift),
+        _ => ProfilePageV2(
+            staff: widget.staff,
+            facility: widget.facility,
+            onEndShift: widget.onEndShift,
+          ),
       };
 
   @override
@@ -73,10 +95,18 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
           final desktop = constraints.maxWidth >= 920;
           return Row(children: [
             if (desktop) _desktopNavigation(),
-            Expanded(child: Column(children: [
-              _topBar(desktop),
-              Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), switchInCurve: Curves.easeOutCubic, child: KeyedSubtree(key: ValueKey(index), child: page()))),
-            ])),
+            Expanded(
+              child: Column(children: [
+                _topBar(desktop),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    child: KeyedSubtree(key: ValueKey(index), child: page()),
+                  ),
+                ),
+              ]),
+            ),
           ]);
         }),
       ),
@@ -84,7 +114,10 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
           ? NavigationBar(
               selectedIndex: index,
               onDestinationSelected: (value) => setState(() => index = value),
-              destinations: [for (final item in items) NavigationDestination(icon: Icon(item.icon), label: item.label)],
+              destinations: [
+                for (final item in items)
+                  NavigationDestination(icon: Icon(item.icon), label: item.label),
+              ],
             )
           : null,
     );
@@ -93,7 +126,10 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   Widget _desktopNavigation() => Container(
         width: 236,
         padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
-        decoration: const BoxDecoration(color: Colors.white, border: Border(right: BorderSide(color: medqurLine))),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(right: BorderSide(color: medqurLine)),
+        ),
         child: Column(children: [
           const MedqurLogo(width: 150),
           const SizedBox(height: 30),
@@ -111,7 +147,12 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
               ),
             ),
           const Spacer(),
-          Text(widget.staff.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 12)),
+          Text(
+            widget.staff.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 12),
+          ),
           const SizedBox(height: 3),
           Text(widget.staff.title, style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11)),
         ]),
@@ -120,15 +161,35 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   Widget _topBar(bool desktop) => Container(
         height: 70,
         padding: EdgeInsets.symmetric(horizontal: desktop ? 28 : 16),
-        decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: medqurLine))),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: medqurLine)),
+        ),
         child: Row(children: [
           if (!desktop) ...[const MedqurLogo(width: 108), const SizedBox(width: 10)],
-          Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: desktop ? CrossAxisAlignment.start : CrossAxisAlignment.end, children: [
-            Text(widget.facility.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 13)),
-            const SizedBox(height: 2),
-            const Text('Active shift • V0.2', style: TextStyle(color: Color(0xFF78869A), fontSize: 11)),
-          ])),
-          if (desktop) ...[const SizedBox(width: 14), const StatusPill(label: 'Device session', color: medqurGreen, icon: Icons.lock_rounded)],
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: desktop ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+              children: [
+                Text(
+                  widget.facility.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Active shift • V0.3 • P1–P4 triage',
+                  style: TextStyle(color: Color(0xFF78869A), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (desktop) ...[
+            const SizedBox(width: 14),
+            const StatusPill(label: 'Device session', color: medqurGreen, icon: Icons.lock_rounded),
+          ],
         ]),
       );
 }
