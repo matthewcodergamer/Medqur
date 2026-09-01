@@ -1,7 +1,7 @@
 name: medqur
 description: Medqur clinical workflow prototype for web, iOS, and Android.
 publish_to: "none"
-version: 0.6.0+6
+version: 0.6.1+7
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
@@ -24,5 +24,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/medqur_logo.png
     - assets/ministry_health_logo.png
     - assets/medqur_app_icon.svg
