@@ -1,12 +1,45 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.4 adds a Jamaica-focused public-facility classification and directory layer on top of the V0.3 P1–P4 emergency triage workflow and the V0.2 camera, biometric, wristband and medication-scanning foundation.
+Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.5 adds a safe, test-only NIDS QR workflow on top of the V0.4 Jamaica public-facility directory, V0.3 P1–P4 triage, and V0.2 camera/biometric/wristband/medication-scanning foundation.
 
-> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, triage, referral acceptance, medication administration or storage of protected health information. Production facility classifications, transfer pathways, operational status, P1–P4 rules and clinical language must be formally validated and governed by Jamaica's Ministry of Health & Wellness, the Regional Health Authorities and participating facilities.
+> **Prototype only:** Do not use this repository for real patient identification, NIRA/NIDS verification, diagnosis, treatment decisions, triage, referral acceptance, medication administration or storage of protected health information. Production identity, facility, triage and clinical workflows must be formally validated and governed by Jamaica's Ministry of Health & Wellness, NIRA, the Regional Health Authorities and participating facilities.
+
+## V0.5 — NIDS test credential loop
+
+V0.5 adds a complete physical testing path for a **clearly fictional Medqur NIDS integration test card**. It does not reproduce or authenticate Jamaica's real National Identification Card.
+
+### Test credential generator
+
+- New **NIDS test QR generator** under the Scan workflow.
+- Staff can enter a fictional given name, surname, ISO date of birth and **TEST-** National ID number.
+- Medqur serializes those test fields into a versioned `medqur://nids-test/v1/...` QR payload.
+- The QR is rendered by Flutter's QR library, not by an image-generation model, so the code is genuinely machine-readable.
+- The generator visibly labels the output **TEST ONLY / NOT VALID / NOT GOVERNMENT IDENTIFICATION**.
+- The prototype intentionally forces the test National ID number to use a `TEST-` prefix.
+- Base64URL is only transport encoding; it is not encryption, signing or NIRA authentication.
+
+### Registration by scan
+
+- New Encounter → NIDS / NIC opens the real camera scanner.
+- When a Medqur NIDS TEST QR is scanned, Medqur decodes the same fictional **name, date of birth and TEST NIN** from the code.
+- Patient name and age are automatically prefilled from the scanned test credential.
+- Date of birth and TEST National ID number are stored with the prototype patient record.
+- The encounter timeline explicitly records that the test QR was decoded and that **NIRA verification was not performed**.
+- Unknown codes can still be captured, but they are not treated as verified identity.
+
+### Scanner positioning
+
+- Staff-ID and NIDS scanning now show a full landscape card outline plus a smaller blue machine-code guide on the back-of-card region.
+- Wristband scanning uses a wide horizontal scan area.
+- Medication scanning remains optimized for QR, Data Matrix and common linear package barcodes.
+
+### Production boundary
+
+The V0.5 self-contained QR is for synthetic prototype testing only. A production Medqur deployment should **not place a person's complete identity record or sensitive NIDS data into a client-generated QR code**. Production should use an approved NIRA verification interface and/or an opaque server-issued credential that resolves to authorized identity data after authentication and consent checks.
 
 ## V0.4 — Jamaica public-facility tiers
 
-Medqur now models the public health-service hierarchy directly instead of treating every workplace as a generic hospital or clinic.
+Medqur models the public health-service hierarchy directly instead of treating every workplace as a generic hospital or clinic.
 
 ### Hospital classes
 
@@ -25,15 +58,15 @@ Medqur now models the public health-service hierarchy directly instead of treati
 
 ### Facility-directory implementation
 
-- A new data-driven Jamaica public-facility catalogue contains the supplied Type A/B/C hospitals, national specialist institutions and the named Type 1–5 health centres across the parishes.
-- Facility records now carry a structured classification, parish, care level, typical capability summary, population band where relevant, specialist focus and referral-role description.
-- The shift-selection screen shows the authorized site's official tier and care level instead of a generic facility label.
-- A new **Jamaica facility directory** lets staff search by name, town or specialty, filter by A/B/C, specialist or Type 1–5 classification, and filter by parish/service area.
+- A data-driven Jamaica public-facility catalogue contains the supplied Type A/B/C hospitals, national specialist institutions and the named Type 1–5 health centres across the parishes.
+- Facility records carry a structured classification, parish, care level, typical capability summary, population band where relevant, specialist focus and referral-role description.
+- Shift selection shows the authorized site's tier and care level instead of a generic facility label.
+- The **Jamaica facility directory** lets staff search by name, town or specialty, filter by A/B/C, specialist or Type 1–5 classification, and filter by parish/service area.
 - Facility detail sheets explain the typical role, capability envelope and referral position of each tier.
-- The staff profile and active clinical shell now show the current facility tier so clinical context remains visible while working.
-- Starting a shift is still restricted to the staff profile's authorized facilities; browsing the national directory does not grant access.
+- The staff profile and active clinical shell show the current facility tier.
+- Starting a shift remains restricted to the staff profile's authorized facilities; browsing the directory does not grant access.
 
-The V0.4 catalogue is intentionally replaceable. In production, the seed data must be replaced by an authoritative Ministry/RHA registry with live service availability, staffing, opening hours, bed state and transfer-acceptance data. Medqur does not automatically choose a transfer destination based only on the static classification.
+The V0.4 catalogue is intentionally replaceable. In production, the seed data must be replaced by an authoritative Ministry/RHA registry with live service availability, staffing, opening hours, bed state and transfer-acceptance data. Medqur does not automatically choose a transfer destination based only on static classification.
 
 ## V0.3 — P1–P4 emergency triage
 
@@ -84,12 +117,13 @@ Triage classification remains a clinician-entered decision. The prototype does n
 - secure browser passkey relying-party server
 - production cross-device realtime backend
 - production clinical database or audit service
+- production printer bridge / Zebra wristband output
 
 The browser build can use the camera, but secure browser passkeys require a server-generated WebAuthn challenge. The public web build does not fake that security step.
 
 ## Medication identification
 
-Medqur does **not** require every medicine to receive a custom Medqur QR. The scanner accepts both 2D and linear codes. In a production deployment, a scanned GTIN/GS1 code (or a hospital-generated unit-dose code where necessary) would resolve against an approved medication/product master before it can match an active order.
+Medqur does **not** require every medicine to receive a custom Medqur QR. The scanner accepts both 2D and linear codes. In production, a scanned GTIN/GS1 DataMatrix or other approved package code (or a hospital-generated unit-dose code where necessary) would resolve against an approved medication/product master before it can match an active order.
 
 ## Demo staff IDs
 
@@ -100,7 +134,7 @@ The ID field starts empty. Use **Use demo ID** for quick public-prototype access
 
 ## Branding
 
-The Medqur wordmark is drawn as vector UI instead of the old raster image, eliminating the grey rectangle visible in some browsers. `assets/medqur_app_icon.svg` is the canonical high-quality app/favicon artwork: blue Medqur mark on white, matching the supplied icon. CI generates Android, iOS and web raster icon sizes from the same geometry.
+The Medqur wordmark is drawn as vector UI instead of the old raster image, eliminating the grey rectangle visible in some browsers. `assets/medqur_app_icon.svg` is the canonical high-quality app/favicon artwork: blue Medqur mark on white. CI generates Android, iOS and web raster icon sizes from the same geometry.
 
 ## Build
 
