@@ -4,6 +4,126 @@ enum TriageLevel { critical, urgent, moderate, routine }
 
 enum PatientStatus { waiting, triaged, withDoctor, treatment, discharge }
 
+enum FacilityClass {
+  typeAHospital,
+  typeBHospital,
+  typeCHospital,
+  specialistHospital,
+  type1HealthCentre,
+  type2HealthCentre,
+  type3HealthCentre,
+  type4HealthCentre,
+  type5HealthCentre,
+  other,
+}
+
+extension FacilityClassInfo on FacilityClass {
+  String get label => switch (this) {
+        FacilityClass.typeAHospital => 'Type A hospital',
+        FacilityClass.typeBHospital => 'Type B hospital',
+        FacilityClass.typeCHospital => 'Type C hospital',
+        FacilityClass.specialistHospital => 'Specialist hospital',
+        FacilityClass.type1HealthCentre => 'Type 1 health centre',
+        FacilityClass.type2HealthCentre => 'Type 2 health centre',
+        FacilityClass.type3HealthCentre => 'Type 3 health centre',
+        FacilityClass.type4HealthCentre => 'Type 4 health centre',
+        FacilityClass.type5HealthCentre => 'Type 5 health centre',
+        FacilityClass.other => 'Other facility',
+      };
+
+  String get shortLabel => switch (this) {
+        FacilityClass.typeAHospital => 'Type A',
+        FacilityClass.typeBHospital => 'Type B',
+        FacilityClass.typeCHospital => 'Type C',
+        FacilityClass.specialistHospital => 'Specialist',
+        FacilityClass.type1HealthCentre => 'Type 1',
+        FacilityClass.type2HealthCentre => 'Type 2',
+        FacilityClass.type3HealthCentre => 'Type 3',
+        FacilityClass.type4HealthCentre => 'Type 4',
+        FacilityClass.type5HealthCentre => 'Type 5',
+        FacilityClass.other => 'Other',
+      };
+
+  String get careLevel => switch (this) {
+        FacilityClass.typeAHospital => 'Comprehensive tertiary & secondary care',
+        FacilityClass.typeBHospital => 'Standard secondary care',
+        FacilityClass.typeCHospital => 'Basic district secondary care',
+        FacilityClass.specialistHospital => 'National specialist care',
+        FacilityClass.type1HealthCentre => 'Community preventive / primary care',
+        FacilityClass.type2HealthCentre => 'Standard community primary care',
+        FacilityClass.type3HealthCentre => 'Full-service district primary care',
+        FacilityClass.type4HealthCentre => 'Parish-level comprehensive primary care',
+        FacilityClass.type5HealthCentre => 'Comprehensive urban primary care hub',
+        FacilityClass.other => 'Facility-specific care',
+      };
+
+  String? get populationBand => switch (this) {
+        FacilityClass.type1HealthCentre => 'Typically under 4,000 people',
+        FacilityClass.type2HealthCentre => 'Typically up to 12,000 people',
+        FacilityClass.type3HealthCentre => 'Typically up to 20,000 people',
+        FacilityClass.type4HealthCentre => 'Typically 20,000–30,000 people',
+        FacilityClass.type5HealthCentre => 'Typically over 30,000 people',
+        _ => null,
+      };
+
+  String get capabilitySummary => switch (this) {
+        FacilityClass.typeAHospital =>
+          'Major medical fields, subspecialties, advanced diagnostics, intensive care and blood-banking capability.',
+        FacilityClass.typeBHospital =>
+          'Core secondary disciplines including medicine, surgery, obstetrics/gynaecology, paediatrics, anaesthesia and emergency care.',
+        FacilityClass.typeCHospital =>
+          'General medicine, basic inpatient care, minor procedures, maternity/child care, basic imaging and laboratory support.',
+        FacilityClass.specialistHospital =>
+          'Focused national or regional services for a defined specialty or patient population.',
+        FacilityClass.type1HealthCentre =>
+          'Maternal and child health, routine immunisation, health education and basic first aid with visiting clinical staff.',
+        FacilityClass.type2HealthCentre =>
+          'Family health, routine curative care, basic pharmacy/dispensing, dental and environmental-health support.',
+        FacilityClass.type3HealthCentre =>
+          'Full-time medical officers plus expanded family health, dental, mental health, sexual health and disease-surveillance services.',
+        FacilityClass.type4HealthCentre =>
+          'High-volume parish services plus administration and coordination of community health programmes.',
+        FacilityClass.type5HealthCentre =>
+          'Large urban outpatient hub with multidisciplinary teams, diagnostics, specialised clinics and often extended hours.',
+        FacilityClass.other => 'Capabilities vary by facility.',
+      };
+
+  String get referralRole => switch (this) {
+        FacilityClass.typeAHospital =>
+          'Highest general referral tier for cases requiring tertiary or advanced multidisciplinary care.',
+        FacilityClass.typeBHospital =>
+          'Secondary referral centre; escalate cases beyond core secondary capability to an appropriate Type A or specialist hospital.',
+        FacilityClass.typeCHospital =>
+          'District hospital; stabilise and transfer cases needing services beyond local capability to Type B, Type A or specialist care.',
+        FacilityClass.specialistHospital =>
+          'Receive referrals matching the hospital’s specialist service; other emergencies follow the general hospital network.',
+        FacilityClass.type1HealthCentre ||
+        FacilityClass.type2HealthCentre ||
+        FacilityClass.type3HealthCentre ||
+        FacilityClass.type4HealthCentre ||
+        FacilityClass.type5HealthCentre =>
+          'Primary-care entry point; refer or transfer patients who need hospital-level emergency, inpatient or specialist services.',
+        FacilityClass.other => 'Referral pathway depends on the facility’s approved service scope.',
+      };
+
+  bool get isHospital => switch (this) {
+        FacilityClass.typeAHospital ||
+        FacilityClass.typeBHospital ||
+        FacilityClass.typeCHospital ||
+        FacilityClass.specialistHospital => true,
+        _ => false,
+      };
+
+  bool get isHealthCentre => switch (this) {
+        FacilityClass.type1HealthCentre ||
+        FacilityClass.type2HealthCentre ||
+        FacilityClass.type3HealthCentre ||
+        FacilityClass.type4HealthCentre ||
+        FacilityClass.type5HealthCentre => true,
+        _ => false,
+      };
+}
+
 class StaffProfile {
   const StaffProfile({
     required this.id,
@@ -25,12 +145,35 @@ class StaffProfile {
 }
 
 class Facility {
-  const Facility({required this.id, required this.name, required this.area, required this.type, this.suggested = false});
+  const Facility({
+    required this.id,
+    required this.name,
+    required this.area,
+    required this.type,
+    this.classification = FacilityClass.other,
+    this.parish = '',
+    this.specialty,
+    this.suggested = false,
+  });
+
   final String id;
   final String name;
   final String area;
   final String type;
+  final FacilityClass classification;
+  final String parish;
+  final String? specialty;
   final bool suggested;
+
+  String get classificationLabel => classification.label;
+  String get careLevel => classification.careLevel;
+  String get capabilitySummary => specialty == null || specialty!.isEmpty
+      ? classification.capabilitySummary
+      : '${classification.capabilitySummary} Focus: $specialty.';
+  String get referralRole => classification.referralRole;
+  String? get populationBand => classification.populationBand;
+  bool get isHospital => classification.isHospital;
+  bool get isHealthCentre => classification.isHealthCentre;
 }
 
 class MedicationOrder {
