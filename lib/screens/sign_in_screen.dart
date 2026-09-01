@@ -77,14 +77,24 @@ class _SignInScreenState extends State<SignInScreen> {
       ),
     );
     if (capture == null || !mounted) return;
+
     var value = capture.value.trim();
-    final uri = Uri.tryParse(value);
-    if (uri != null &&
-        uri.scheme == 'medqur' &&
-        uri.host == 'staff' &&
-        uri.pathSegments.isNotEmpty) {
-      value = uri.pathSegments.last;
+
+    // Current compact badge format. It produces a materially simpler QR than
+    // the old medqur://staff/... URI.
+    if (value.toUpperCase().startsWith('MQS|')) {
+      value = value.substring(4);
+    } else {
+      // Backward compatibility with already-printed prototype staff badges.
+      final uri = Uri.tryParse(value);
+      if (uri != null &&
+          uri.scheme == 'medqur' &&
+          uri.host == 'staff' &&
+          uri.pathSegments.isNotEmpty) {
+        value = uri.pathSegments.last;
+      }
     }
+
     _controller.text = value.toUpperCase();
     await _continue();
   }
