@@ -243,6 +243,8 @@ class Patient {
     required this.medications,
     this.dateOfBirth,
     this.nationalIdNumber,
+    this.encounterId,
+    this.facilityName,
     this.assignedStaffId,
     this.assignedStaffName,
   });
@@ -262,10 +264,15 @@ class Patient {
   final List<MedicationOrder> medications;
   final String? dateOfBirth;
   final String? nationalIdNumber;
+  final String? encounterId;
+  final String? facilityName;
   String? assignedStaffId;
   String? assignedStaffName;
 
-  String get encounterToken => 'medqur://encounter/$id';
+  String get effectiveEncounterId =>
+      encounterId == null || encounterId!.trim().isEmpty ? 'ENC-$id' : encounterId!;
+
+  String get encounterToken => 'medqur://encounter/$effectiveEncounterId';
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -283,6 +290,8 @@ class Patient {
         'medications': medications.map((item) => item.toJson()).toList(),
         'dateOfBirth': dateOfBirth,
         'nationalIdNumber': nationalIdNumber,
+        'encounterId': encounterId,
+        'facilityName': facilityName,
         'assignedStaffId': assignedStaffId,
         'assignedStaffName': assignedStaffName,
       };
@@ -308,6 +317,8 @@ class Patient {
           .toList(),
       dateOfBirth: json['dateOfBirth']?.toString(),
       nationalIdNumber: json['nationalIdNumber']?.toString(),
+      encounterId: json['encounterId']?.toString(),
+      facilityName: json['facilityName']?.toString(),
       assignedStaffId: json['assignedStaffId']?.toString(),
       assignedStaffName: json['assignedStaffName']?.toString(),
     );
