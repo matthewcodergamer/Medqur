@@ -51,7 +51,11 @@ class _ScanPageV2State extends State<ScanPageV2> {
 
   Patient? _findEncounter(String raw) {
     for (final patient in widget.patients) {
-      if (raw == patient.encounterToken || raw == patient.id) return patient;
+      if (raw == patient.encounterToken ||
+          raw == patient.effectiveEncounterId ||
+          raw == patient.id) {
+        return patient;
+      }
     }
     return null;
   }
