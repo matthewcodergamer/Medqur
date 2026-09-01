@@ -1,12 +1,43 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.3 adds a Jamaica-focused P1–P4 emergency triage workflow on top of the V0.2 camera, biometric, wristband and medication-scanning foundation.
+Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.4 adds a Jamaica-focused public-facility classification and directory layer on top of the V0.3 P1–P4 emergency triage workflow and the V0.2 camera, biometric, wristband and medication-scanning foundation.
 
-> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, triage, medication administration or storage of protected health information. Any production P1–P4 rules, routing targets and clinical language must be formally validated and governed by Jamaica's Ministry of Health & Wellness and participating facilities.
+> **Prototype only:** Do not use this repository for real patient identification, diagnosis, treatment decisions, triage, referral acceptance, medication administration or storage of protected health information. Production facility classifications, transfer pathways, operational status, P1–P4 rules and clinical language must be formally validated and governed by Jamaica's Ministry of Health & Wellness, the Regional Health Authorities and participating facilities.
+
+## V0.4 — Jamaica public-facility tiers
+
+Medqur now models the public health-service hierarchy directly instead of treating every workplace as a generic hospital or clinic.
+
+### Hospital classes
+
+- **Type A hospital** — comprehensive tertiary and secondary care, major specialties/subspecialties, advanced diagnostics and the highest general referral tier.
+- **Type B hospital** — standard secondary care across the core clinical disciplines, with escalation to Type A or specialist care when required.
+- **Type C hospital** — district secondary care with stabilisation and transfer for cases beyond local capability.
+- **Specialist hospital** — focused institutions such as paediatric, maternity, respiratory, mental-health, rehabilitation and oncology services.
+
+### Health-centre classes
+
+- **Type 1** — community preventive and maternal/child health outpost, typically serving under 4,000 people.
+- **Type 2** — standard community primary care, typically serving up to 12,000 people.
+- **Type 3** — full-service district primary-care hub, typically serving up to 20,000 people.
+- **Type 4** — parish-level comprehensive primary-care and programme-coordination centre, typically serving 20,000–30,000 people.
+- **Type 5** — comprehensive urban primary-care hub, typically serving more than 30,000 people with multidisciplinary services, diagnostics and specialised clinics.
+
+### Facility-directory implementation
+
+- A new data-driven Jamaica public-facility catalogue contains the supplied Type A/B/C hospitals, national specialist institutions and the named Type 1–5 health centres across the parishes.
+- Facility records now carry a structured classification, parish, care level, typical capability summary, population band where relevant, specialist focus and referral-role description.
+- The shift-selection screen shows the authorized site's official tier and care level instead of a generic facility label.
+- A new **Jamaica facility directory** lets staff search by name, town or specialty, filter by A/B/C, specialist or Type 1–5 classification, and filter by parish/service area.
+- Facility detail sheets explain the typical role, capability envelope and referral position of each tier.
+- The staff profile and active clinical shell now show the current facility tier so clinical context remains visible while working.
+- Starting a shift is still restricted to the staff profile's authorized facilities; browsing the national directory does not grant access.
+
+The V0.4 catalogue is intentionally replaceable. In production, the seed data must be replaced by an authoritative Ministry/RHA registry with live service availability, staffing, opening hours, bed state and transfer-acceptance data. Medqur does not automatically choose a transfer destination based only on the static classification.
 
 ## V0.3 — P1–P4 emergency triage
 
-Medqur now presents the emergency priority levels directly in the encounter workflow and patient queue:
+Medqur presents the emergency priority levels directly in the encounter workflow and patient queue:
 
 - **P1 • Critical** — life-threatening emergency requiring immediate life-saving intervention; route directly to resuscitation.
 - **P2 • Emergent** — severe or potentially life-threatening condition requiring rapid medical assessment and urgent treatment; route to a priority treatment area.
@@ -47,6 +78,8 @@ Triage classification remains a clinician-entered decision. The prototype does n
 
 - NIRA/NIDS production verification
 - Ministry of Health production identity/services
+- authoritative Ministry/RHA facility registry
+- live hospital capacity / bed-state / transfer-acceptance service
 - e-Care / SystmOne
 - secure browser passkey relying-party server
 - production cross-device realtime backend
