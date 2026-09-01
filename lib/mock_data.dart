@@ -5,20 +5,26 @@ const facilities = <Facility>[
     id: 'MRH',
     name: 'Mandeville Regional Hospital',
     area: 'Mandeville, Manchester',
-    type: 'Regional Hospital',
+    parish: 'Manchester',
+    type: 'Hospital',
+    classification: FacilityClass.typeBHospital,
     suggested: true,
   ),
   Facility(
     id: 'JHC',
     name: 'Junction Health Centre',
     area: 'Junction, St. Elizabeth',
+    parish: 'St. Elizabeth',
     type: 'Health Centre',
+    classification: FacilityClass.type2HealthCentre,
   ),
   Facility(
     id: 'SPH',
     name: 'Spanish Town Hospital',
     area: 'Spanish Town, St. Catherine',
+    parish: 'St. Catherine',
     type: 'Hospital',
+    classification: FacilityClass.typeBHospital,
   ),
 ];
 
