@@ -179,9 +179,11 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
                   style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'Active shift • V0.3 • P1–P4 triage',
-                  style: TextStyle(color: Color(0xFF78869A), fontSize: 11),
+                Text(
+                  'Active shift • V0.4 • ${widget.facility.classification.shortLabel} • P1–P4 triage',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF78869A), fontSize: 11),
                 ),
               ],
             ),
