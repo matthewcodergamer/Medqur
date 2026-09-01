@@ -241,6 +241,8 @@ class Patient {
     required this.allergies,
     required this.timeline,
     required this.medications,
+    this.dateOfBirth,
+    this.nationalIdNumber,
     this.assignedStaffId,
     this.assignedStaffName,
   });
@@ -258,6 +260,8 @@ class Patient {
   final List<String> allergies;
   final List<String> timeline;
   final List<MedicationOrder> medications;
+  final String? dateOfBirth;
+  final String? nationalIdNumber;
   String? assignedStaffId;
   String? assignedStaffName;
 
@@ -277,6 +281,8 @@ class Patient {
         'allergies': allergies,
         'timeline': timeline,
         'medications': medications.map((item) => item.toJson()).toList(),
+        'dateOfBirth': dateOfBirth,
+        'nationalIdNumber': nationalIdNumber,
         'assignedStaffId': assignedStaffId,
         'assignedStaffName': assignedStaffName,
       };
@@ -300,6 +306,8 @@ class Patient {
       medications: (json['medications'] as List<dynamic>? ?? [])
           .map((item) => MedicationOrder.fromJson(item as Map<String, dynamic>))
           .toList(),
+      dateOfBirth: json['dateOfBirth']?.toString(),
+      nationalIdNumber: json['nationalIdNumber']?.toString(),
       assignedStaffId: json['assignedStaffId']?.toString(),
       assignedStaffName: json['assignedStaffName']?.toString(),
     );
