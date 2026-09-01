@@ -20,6 +20,8 @@ class PatientQueuePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = patients.where((p) => p.status != PatientStatus.discharge).toList()
       ..sort((a, b) => a.triage.index.compareTo(b.triage.index));
+    final p1Count = active.where((p) => p.triage == TriageLevel.critical).length;
+    final p2Count = active.where((p) => p.triage == TriageLevel.urgent).length;
 
     return ListView(
       padding: const EdgeInsets.all(22),
@@ -36,7 +38,7 @@ class PatientQueuePage extends StatelessWidget {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 6),
-                    Text('${active.length} active patients • prioritized by triage status'),
+                    Text('${active.length} active patients • prioritized P1 → P4'),
                   ],
                 ),
               ),
@@ -49,29 +51,52 @@ class PatientQueuePage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        const SectionTitle('Emergency priority'),
+        const SizedBox(height: 10),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            _Metric(
-              label: 'Waiting',
-              value: '${patients.where((p) => p.status == PatientStatus.waiting).length}',
-              icon: Icons.schedule_rounded,
-            ),
-            _Metric(
-              label: 'Triaged',
-              value: '${patients.where((p) => p.status == PatientStatus.triaged).length}',
-              icon: Icons.fact_check_outlined,
-            ),
-            _Metric(
-              label: 'Treatment',
-              value: '${patients.where((p) => p.medications.isNotEmpty).length}',
-              icon: Icons.medication_outlined,
-            ),
+            for (final level in TriageLevel.values)
+              _PriorityMetric(
+                level: level,
+                value: active.where((p) => p.triage == level).length,
+              ),
           ],
         ),
+        if (p1Count + p2Count > 0) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: medqurRed.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: medqurRed.withValues(alpha: .20)),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.emergency_rounded, color: medqurRed),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${p1Count > 0 ? '$p1Count P1' : ''}${p1Count > 0 && p2Count > 0 ? ' • ' : ''}${p2Count > 0 ? '$p2Count P2' : ''} active. P1/P2 patients require immediate or urgent routing and should not remain in routine waiting.',
+                  style: const TextStyle(
+                    color: medqurInk,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 24),
         const SectionTitle('Priority list'),
+        const SizedBox(height: 6),
+        const Text(
+          'P1 appears first, followed by P2, P3 and P4. Clinical teams remain responsible for reassessment and escalation.',
+          style: TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.35),
+        ),
         const SizedBox(height: 12),
         ...active.map(
           (patient) => Padding(
@@ -84,35 +109,50 @@ class PatientQueuePage extends StatelessWidget {
   }
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value, required this.icon});
-  final String label;
-  final String value;
-  final IconData icon;
+class _PriorityMetric extends StatelessWidget {
+  const _PriorityMetric({required this.level, required this.value});
+
+  final TriageLevel level;
+  final int value;
 
   @override
   Widget build(BuildContext context) {
+    final color = triageColor(level);
     return Container(
-      width: 156,
-      padding: const EdgeInsets.all(16),
+      width: 146,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(19),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: medqurLine),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: medqurBlue, size: 22),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: medqurInk)),
-              Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF748297))),
-            ],
+      child: Row(children: [
+        Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
+          child: Text(
+            triageCode(level),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              '$value',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: medqurInk),
+            ),
+            Text(
+              triageName(level),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF748297)),
+            ),
+          ]),
+        ),
+      ]),
     );
   }
 }
@@ -130,13 +170,14 @@ class _PatientTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = triageColor(patient.triage);
+    final highPriority = triageBypassesRoutineWaiting(patient.triage);
     return SoftCard(
       onTap: onTap,
       child: Row(
         children: [
           Container(
             width: 5,
-            height: 66,
+            height: highPriority ? 84 : 72,
             decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
           ),
           const SizedBox(width: 14),
@@ -151,16 +192,20 @@ class _PatientTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text(
-                        patient.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 15),
+                    Text(
+                      patient.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: medqurInk,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(width: 8),
                     StatusPill(label: triageLabel(patient.triage), color: color),
                   ],
                 ),
@@ -171,10 +216,23 @@ class _PatientTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF66768B), fontSize: 13),
                 ),
+                if (highPriority) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    triageAction(patient.triage),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   '${patient.id} • ${patientStatusLabel(patient.status)} • ${patient.waitMinutes} min',
-                  style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Color(0xFF8793A4),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
