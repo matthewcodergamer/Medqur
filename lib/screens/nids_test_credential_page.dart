@@ -65,7 +65,7 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Test QR payload copied.'),
+      content: Text('Compact test QR payload copied.'),
       behavior: SnackBarBehavior.floating,
     ));
   }
@@ -89,7 +89,7 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Prototype tool only. It creates a Medqur TEST QR containing the fake cardholder name, date of birth and TEST NIN so the phone scanner can prefill a patient encounter. It is not NIRA verification and must not be used with real identity data.',
+                  'Prototype tool only. The V2 test code uses a much shorter payload and low QR error correction so it has fewer modules and is easier for phone cameras to resolve on ID-sized cards. It is not NIRA verification and must not be used with real identity data.',
                   style: TextStyle(height: 1.42),
                 ),
               ),
@@ -124,7 +124,7 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
             decoration: const InputDecoration(labelText: 'TEST National ID number', hintText: 'TEST-000000000', prefixIcon: Icon(Icons.badge_outlined)),
           ),
           const SizedBox(height: 14),
-          FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.qr_code_2_rounded), label: const Text('Generate test QR')),
+          FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.qr_code_2_rounded), label: const Text('Generate compact test QR')),
           if (_error != null) ...[
             const SizedBox(height: 10),
             Text(_error!, style: const TextStyle(color: medqurRed, fontWeight: FontWeight.w700)),
@@ -145,7 +145,7 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
                     ]),
                     const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(18),
@@ -154,10 +154,17 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
                       child: QrImageView(
                         data: credential.encode(),
                         version: QrVersions.auto,
+                        errorCorrectionLevel: QrErrorCorrectLevel.L,
                         size: 224,
                         padding: EdgeInsets.zero,
                         backgroundColor: Colors.white,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Keep a clear white quiet zone around the code. Do not crop it tightly when printing.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF748297), fontSize: 11, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
                     Text(credential.fullName, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w900, fontSize: 18)),
@@ -174,13 +181,7 @@ class _NidsTestCredentialPageState extends State<NidsTestCredentialPage> {
               ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(onPressed: _copyPayload, icon: const Icon(Icons.copy_rounded), label: const Text('Copy test payload')),
-            const SizedBox(height: 8),
-            const Text(
-              'Print or place this generated QR on the back of a clearly marked Medqur test card. On scan, Medqur decodes the same name, DOB and TEST NIN and can prefill the encounter form.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.4),
-            ),
+            OutlinedButton.icon(onPressed: _copyPayload, icon: const Icon(Icons.copy_rounded), label: const Text('Copy compact test payload')),
           ],
         ],
       ),
