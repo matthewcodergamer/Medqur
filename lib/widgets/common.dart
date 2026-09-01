@@ -84,6 +84,7 @@ class _MedqurMarkPainter extends CustomPainter {
 class MinistryLogo extends StatelessWidget {
   const MinistryLogo({super.key, this.size = 58});
   final double size;
+
   @override
   Widget build(BuildContext context) => Image.asset(
         AppAssets.ministryLogo,
@@ -115,13 +116,19 @@ class SoftCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: highlighted ? medqurBlue.withValues(alpha: .55) : medqurLine, width: highlighted ? 1.5 : 1),
+        border: Border.all(
+          color: highlighted ? medqurBlue.withValues(alpha: .55) : medqurLine,
+          width: highlighted ? 1.5 : 1,
+        ),
         boxShadow: const [BoxShadow(color: Color(0x0A173F8A), blurRadius: 22, offset: Offset(0, 8))],
       ),
       child: child,
     );
     if (onTap == null) return card;
-    return Material(color: Colors.transparent, child: InkWell(borderRadius: BorderRadius.circular(22), onTap: onTap, child: card));
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: BorderRadius.circular(22), onTap: onTap, child: card),
+    );
   }
 }
 
@@ -129,9 +136,15 @@ class SectionTitle extends StatelessWidget {
   const SectionTitle(this.title, {super.key, this.trailing});
   final String title;
   final Widget? trailing;
+
   @override
   Widget build(BuildContext context) => Row(children: [
-        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: medqurInk))),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: medqurInk),
+          ),
+        ),
         if (trailing != null) trailing!,
       ]);
 }
@@ -141,6 +154,7 @@ class StatusPill extends StatelessWidget {
   final String label;
   final Color color;
   final IconData? icon;
+
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -152,6 +166,9 @@ class StatusPill extends StatelessWidget {
       );
 }
 
+/// The persisted enum names remain critical/urgent/moderate/routine so V0.2
+/// prototype data still loads, while the clinical UI now exposes Jamaica's
+/// P1-P4 emergency-priority terminology.
 Color triageColor(TriageLevel level) => switch (level) {
       TriageLevel.critical => medqurRed,
       TriageLevel.urgent => const Color(0xFFE46A25),
@@ -159,12 +176,38 @@ Color triageColor(TriageLevel level) => switch (level) {
       TriageLevel.routine => medqurGreen,
     };
 
-String triageLabel(TriageLevel level) => switch (level) {
-      TriageLevel.critical => 'Critical',
-      TriageLevel.urgent => 'Urgent',
-      TriageLevel.moderate => 'Moderate',
-      TriageLevel.routine => 'Routine',
+String triageCode(TriageLevel level) => switch (level) {
+      TriageLevel.critical => 'P1',
+      TriageLevel.urgent => 'P2',
+      TriageLevel.moderate => 'P3',
+      TriageLevel.routine => 'P4',
     };
+
+String triageName(TriageLevel level) => switch (level) {
+      TriageLevel.critical => 'Critical',
+      TriageLevel.urgent => 'Emergent',
+      TriageLevel.moderate => 'Intermediate',
+      TriageLevel.routine => 'Fast track',
+    };
+
+String triageLabel(TriageLevel level) => '${triageCode(level)} • ${triageName(level)}';
+
+String triageDescription(TriageLevel level) => switch (level) {
+      TriageLevel.critical => 'Life-threatening emergency requiring immediate life-saving intervention.',
+      TriageLevel.urgent => 'Severe or potentially life-threatening condition requiring rapid assessment and urgent treatment.',
+      TriageLevel.moderate => 'Stable, intermediate condition requiring medical care that can be delayed safely for a reasonable period.',
+      TriageLevel.routine => 'Minor, non-acute or routine case appropriate for fast-track care.',
+    };
+
+String triageAction(TriageLevel level) => switch (level) {
+      TriageLevel.critical => 'Immediate • route directly to resuscitation',
+      TriageLevel.urgent => 'Urgent • route to priority treatment area',
+      TriageLevel.moderate => 'Care required • reassess while waiting',
+      TriageLevel.routine => 'Fast track • lowest emergency queue priority',
+    };
+
+bool triageBypassesRoutineWaiting(TriageLevel level) =>
+    level == TriageLevel.critical || level == TriageLevel.urgent;
 
 String patientStatusLabel(PatientStatus status) => switch (status) {
       PatientStatus.waiting => 'Waiting',
@@ -178,6 +221,7 @@ class FadeSlideIn extends StatelessWidget {
   const FadeSlideIn({super.key, required this.child, this.delay = Duration.zero});
   final Widget child;
   final Duration delay;
+
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
@@ -187,17 +231,21 @@ class FadeSlideIn extends StatelessWidget {
           final delayed = delay.inMilliseconds == 0
               ? value
               : ((value * (360 + delay.inMilliseconds) - delay.inMilliseconds) / 360).clamp(0.0, 1.0);
-          return Opacity(opacity: delayed, child: Transform.translate(offset: Offset(0, 9 * (1 - delayed)), child: child));
+          return Opacity(
+            opacity: delayed,
+            child: Transform.translate(offset: Offset(0, 9 * (1 - delayed)), child: child),
+          );
         },
       );
 }
 
 /// Kept under the original class name so V0.1 screens remain source-compatible,
-/// but this now renders an actual, scannable QR code.
+/// but this renders an actual, scannable QR code.
 class FakeQr extends StatelessWidget {
   const FakeQr({super.key, this.size = 88, this.data = 'medqur://prototype'});
   final double size;
   final String data;
+
   @override
   Widget build(BuildContext context) => QrImageView(
         data: data,
