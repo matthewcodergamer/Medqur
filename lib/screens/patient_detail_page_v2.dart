@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../models.dart';
 import '../services/access_policy.dart';
+import '../services/medication_identifier.dart';
+import '../services/medication_master.dart';
+import '../services/medication_safety.dart';
 import '../widgets/common.dart';
 import 'live_scanner_page.dart';
 
@@ -55,6 +59,8 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
     String route = 'Oral';
     String frequency = 'Once';
     String? productCode;
+    MedicationIdentifier? productIdentifier;
+    MedicationProduct? product;
 
     final order = await showModalBottomSheet<MedicationOrder>(
       context: context,
@@ -65,7 +71,23 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
           final capture = await Navigator.of(sheetContext).push<ScanCapture>(
             MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.medication)),
           );
-          if (capture != null) setSheetState(() => productCode = capture.value);
+          if (capture == null) return;
+          final parsed = MedicationIdentifierParser.parse(
+            capture.value,
+            formatName: capture.format.name,
+          );
+          final resolved = MedicationMasterCatalog.lookup(parsed);
+          setSheetState(() {
+            productCode = capture.value;
+            productIdentifier = parsed;
+            product = resolved;
+            if (resolved != null && medication.text.trim().isEmpty) {
+              medication.text = resolved.genericName;
+            }
+            if (resolved != null && dose.text.trim().isEmpty) {
+              dose.text = resolved.strength;
+            }
+          });
         }
 
         return SafeArea(
@@ -96,11 +118,28 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                 OutlinedButton.icon(
                   onPressed: scanPackage,
                   icon: const Icon(Icons.qr_code_scanner_rounded),
-                  label: Text(productCode == null ? 'Scan package barcode / QR' : 'Package code captured'),
+                  label: Text(productCode == null ? 'Scan package barcode / DataMatrix' : 'Package code captured'),
                 ),
-                if (productCode != null) ...[
-                  const SizedBox(height: 7),
-                  Text(productCode!, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF748297), fontSize: 11)),
+                if (productIdentifier != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    product?.displayName ?? productIdentifier!.summary,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: product != null ? medqurGreen : medqurAmber,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (product == null)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Not found in the prototype medication master. Pharmacist/master-data verification is required for production use.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Color(0xFF748297), fontSize: 10),
+                      ),
+                    ),
                 ],
                 const SizedBox(height: 18),
                 FilledButton.icon(
@@ -143,12 +182,18 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
       MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.medication)),
     );
     if (capture == null || !mounted) return;
+    final parsed = MedicationIdentifierParser.parse(capture.value, formatName: capture.format.name);
+    final product = MedicationMasterCatalog.lookup(parsed);
     final index = widget.patient.medications.indexOf(medication);
     if (index < 0) return;
     widget.patient.medications[index] = medication.copyWith(productCode: capture.value);
-    widget.patient.timeline.add('${_timeNow()} — Medication package code mapped by ${widget.staff.name}');
+    widget.patient.timeline.add(
+      '${_timeNow()} — Medication package code mapped by ${widget.staff.name}${parsed.gtin == null ? '' : ' • GTIN ${parsed.gtin}'}',
+    );
     _changed();
-    _message('Package barcode mapped to this order.');
+    _message(product == null
+        ? 'Code mapped. Product master verification is still required.'
+        : '${product.displayName} mapped to this order.');
   }
 
   Future<void> _administer(MedicationOrder medication) async {
@@ -162,7 +207,9 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
       MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.patientWristband)),
     );
     if (patientCapture == null || !mounted) return;
-    if (patientCapture.value != widget.patient.encounterToken && patientCapture.value != widget.patient.id) {
+    if (patientCapture.value != widget.patient.encounterToken &&
+        patientCapture.value != widget.patient.effectiveEncounterId &&
+        patientCapture.value != widget.patient.id) {
       _message('Wristband mismatch. Medication was not administered.', error: true);
       return;
     }
@@ -171,17 +218,72 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
       MaterialPageRoute(builder: (_) => const LiveScannerPage(purpose: ScanPurpose.medication)),
     );
     if (medCapture == null || !mounted) return;
-    if (medCapture.value != medication.productCode) {
-      _message('Medication barcode mismatch. Medication was not administered.', error: true);
+    final scanned = MedicationIdentifierParser.parse(
+      medCapture.value,
+      formatName: medCapture.format.name,
+    );
+    final safety = MedicationSafetyEngine.evaluate(
+      patient: widget.patient,
+      order: medication,
+      scan: scanned,
+    );
+
+    if (!safety.allowed) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.block_rounded, color: medqurRed),
+          title: const Text('Administration blocked'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final blocker in safety.blockers)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $blocker'),
+                ),
+            ],
+          ),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          ],
+        ),
+      );
+      widget.patient.timeline.add(
+        '${_timeNow()} — Medication administration blocked after scan by ${widget.staff.name}: ${safety.blockers.join('; ')}',
+      );
+      _changed();
       return;
     }
 
+    final product = MedicationMasterCatalog.lookup(scanned);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.verified_rounded, color: medqurGreen),
-        title: const Text('Both scans matched'),
-        content: Text('${widget.patient.name}\n${medication.name} ${medication.dose}\n${medication.route} • ${medication.frequency}'),
+        title: const Text('Patient + medication verified'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${widget.patient.name}\n${medication.name} ${medication.dose}\n${medication.route} • ${medication.frequency}'),
+            const SizedBox(height: 10),
+            Text(scanned.summary, style: const TextStyle(fontSize: 11, color: Color(0xFF65748A))),
+            if (product != null) ...[
+              const SizedBox(height: 5),
+              Text('Master data: ${product.displayName}', style: const TextStyle(fontSize: 11, color: medqurGreen, fontWeight: FontWeight.w800)),
+            ],
+            if (safety.warnings.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              for (final warning in safety.warnings)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('Warning: $warning', style: const TextStyle(fontSize: 11, color: medqurAmber, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Record administration')),
@@ -193,7 +295,9 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
     final index = widget.patient.medications.indexOf(medication);
     if (index < 0) return;
     widget.patient.medications[index] = medication.copyWith(administered: true);
-    widget.patient.timeline.add('${_timeNow()} — ${medication.name} ${medication.dose} administered by ${widget.staff.name} after wristband + package scan');
+    widget.patient.timeline.add(
+      '${_timeNow()} — ${medication.name} ${medication.dose} administered by ${widget.staff.name} after wristband + medication scan${scanned.gtin == null ? '' : ' • GTIN ${scanned.gtin}'}${scanned.lotNumber == null ? '' : ' • lot ${scanned.lotNumber}'}',
+    );
     _changed();
     _message('Administration recorded.');
   }
@@ -274,7 +378,7 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                         const SizedBox(height: 3),
                         Text('${medication.route} • ${medication.frequency}', style: const TextStyle(color: Color(0xFF65748A), fontSize: 12)),
                         const SizedBox(height: 3),
-                        Text(medication.productCode == null ? 'Package code not mapped' : 'Package code mapped', style: TextStyle(color: medication.productCode == null ? medqurAmber : medqurGreen, fontSize: 11, fontWeight: FontWeight.w700)),
+                        Text(medication.productCode == null ? 'Package code not mapped' : MedicationIdentifierParser.parse(medication.productCode!).summary, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: medication.productCode == null ? medqurAmber : medqurGreen, fontSize: 11, fontWeight: FontWeight.w700)),
                       ])),
                       StatusPill(label: medication.administered ? 'Given' : 'Pending', color: medication.administered ? medqurGreen : medqurAmber),
                     ]),
