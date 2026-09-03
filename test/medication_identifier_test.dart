@@ -46,6 +46,26 @@ void main() {
       expect(result.serialNumber, 'NBA7002002985');
     });
 
+    test('parses bracket-colon DataMatrix HRI returned by real package scanner', () {
+      final result = MedicationIdentifierParser.parse(
+        '[01]:18904215101509[10]:NBA7002[11]:MAR.2025[17]:FEB.2027[21]:NBA7002002985',
+        formatName: 'dataMatrix',
+      );
+
+      expect(result.isGs1, isTrue);
+      expect(result.gtin, '18904215101509');
+      expect(result.gtinCheckDigitValid, isTrue);
+      expect(result.lotNumber, 'NBA7002');
+      expect(result.manufactureDate, DateTime(2025, 3, 1));
+      expect(result.expiryDate, DateTime(2027, 2, 28));
+      expect(result.serialNumber, 'NBA7002002985');
+      expect(result.kind, MedicationCodeKind.gs1DataMatrix);
+
+      final product = MedicationMasterCatalog.lookup(result);
+      expect(product?.brandName, 'Neurobalin-75');
+      expect(product?.genericName, 'Pregabalin');
+    });
+
     test('normalises EAN/UPC values to GTIN-14', () {
       final result = MedicationIdentifierParser.parse(
         '8906102700515',
@@ -95,6 +115,21 @@ void main() {
       );
       final product = MedicationMasterCatalog.lookup(identifier);
       expect(product?.brandName, 'Mucinex DM Maximum Strength');
+    });
+
+    test('searches local medication fixtures by brand generic and class', () {
+      expect(
+        MedicationMasterCatalog.search('pregabalin').first.brandName,
+        'Neurobalin-75',
+      );
+      expect(
+        MedicationMasterCatalog.search('cephalosporin').first.brandName,
+        'CEFUR',
+      );
+      expect(
+        MedicationMasterCatalog.search('Mucinex').first.genericName,
+        contains('Guaifenesin'),
+      );
     });
   });
 
