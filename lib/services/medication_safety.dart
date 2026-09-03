@@ -29,28 +29,28 @@ class MedicationSafetyEngine {
       blockers.add('This medication order is already recorded as administered.');
     }
 
-    final expectedGtin = order.productGtin;
-    if (expectedGtin != null && expectedGtin.isNotEmpty && scan.gtin != null) {
-      if (expectedGtin != scan.gtin) {
-        blockers.add('Wrong medication product: scanned GTIN does not match the signed order.');
-      }
-    } else if (order.productCode != null && order.productCode!.isNotEmpty) {
-      if (order.productCode != scan.rawValue) {
+    final mappedRaw = order.productCode;
+    if (mappedRaw == null || mappedRaw.isEmpty) {
+      blockers.add('The order does not have an approved medication product identifier mapped.');
+    } else {
+      final mapped = MedicationIdentifierParser.parse(mappedRaw);
+      if (mapped.gtin != null && scan.gtin != null) {
+        if (mapped.gtin != scan.gtin) {
+          blockers.add('Wrong medication product: scanned GTIN does not match the signed order.');
+        }
+      } else if (mapped.rawValue != scan.rawValue) {
         blockers.add('Wrong medication product: scanned code does not match the mapped package.');
       }
-    } else {
-      blockers.add('The order does not have an approved medication product identifier mapped.');
+
+      if (mapped.lotNumber != null &&
+          scan.lotNumber != null &&
+          mapped.lotNumber != scan.lotNumber) {
+        warnings.add('Scanned lot differs from the lot originally mapped to the order.');
+      }
     }
 
     if (scan.isExpired(now)) {
       blockers.add('Medication is expired according to the scanned GS1 expiry date.');
-    }
-
-    if (order.productLot != null &&
-        order.productLot!.isNotEmpty &&
-        scan.lotNumber != null &&
-        order.productLot != scan.lotNumber) {
-      warnings.add('Scanned lot differs from the lot originally mapped to the order.');
     }
 
     if (!scan.isGs1 && scan.gtin == null) {
