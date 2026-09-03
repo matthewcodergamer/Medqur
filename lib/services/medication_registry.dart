@@ -51,12 +51,18 @@ class MedicationNameMatch {
     required this.rxcui,
     required this.score,
     required this.source,
+    this.product,
+    this.trust = MedicationResolutionTrust.publicReference,
   });
 
   final String name;
   final String rxcui;
   final double score;
   final String source;
+  final MedicationProduct? product;
+  final MedicationResolutionTrust trust;
+
+  bool get isProductRecord => product != null;
 }
 
 /// Multi-source medication identity resolver.
@@ -67,8 +73,9 @@ class MedicationNameMatch {
 /// 3. openFDA NDC Directory UPC lookup for compatible US-market packages;
 /// 4. unresolved, requiring pharmacist/master-data verification.
 ///
-/// Public FDA/RxNorm data is reference data only and is never elevated to
-/// Jamaica-approved clinical data.
+/// Name search checks the configured Medqur/PostgreSQL medication master first,
+/// then uses RxNorm as a public terminology fallback. Public FDA/RxNorm data is
+/// reference data only and is never elevated to Jamaica-approved clinical data.
 class MedicationRegistryClient {
   MedicationRegistryClient({
     http.Client? client,
@@ -149,7 +156,7 @@ class MedicationRegistryClient {
         source: local.sourceLabel,
         message: local.clinicallyVerified
             ? 'Product identifier matched an approved medication master record.'
-            : 'The package identity is known to this prototype, but pharmacist/approved-registry verification is still required for clinical use.',
+            : 'Medication identified from the package catalogue. Pharmacist/approved-registry verification is still required for clinical use.',
       );
       _cache[cacheKey] = result;
       return result;
@@ -168,8 +175,8 @@ class MedicationRegistryClient {
       trust: MedicationResolutionTrust.unresolved,
       source: 'No trusted product match',
       message: identifier.gtin == null
-          ? 'The code was captured but no GTIN could be extracted. Manual pharmacist verification is required.'
-          : 'GTIN ${identifier.gtin} was captured, but no configured medication registry matched it.',
+          ? 'The code was captured but no GTIN could be extracted. Try the package barcode or search by medicine name.'
+          : 'GTIN ${identifier.gtin} was captured, but no configured medication registry matched it. Search by name or send it for pharmacist verification.',
       onlineLookup: allowPublicReference,
     );
     _cache[cacheKey] = result;
@@ -179,11 +186,69 @@ class MedicationRegistryClient {
   Future<List<MedicationNameMatch>> searchByName(String query) async {
     final value = query.trim();
     if (value.length < 2) return const [];
+
+    final matches = <MedicationNameMatch>[];
+    final registryMatches = await _searchConfiguredRegistry(value);
+    matches.addAll(registryMatches);
+
+    final rxNormMatches = await _searchRxNorm(value);
+    final seenNames = registryMatches
+        .map((item) => item.name.toLowerCase())
+        .toSet();
+    for (final item in rxNormMatches) {
+      if (seenNames.add(item.name.toLowerCase())) matches.add(item);
+    }
+    return matches;
+  }
+
+  Future<List<MedicationNameMatch>> _searchConfiguredRegistry(String query) async {
+    final configured = configuredBase.trim();
+    if (configured.isEmpty) return const [];
+    try {
+      final base = Uri.parse(configured.endsWith('/') ? configured : '$configured/');
+      final uri = base.resolve('v1/medications/search').replace(
+        queryParameters: {'q': query},
+      );
+      final response = await _client
+          .get(uri, headers: await _backendHeaders())
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) return const [];
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return const [];
+      final results = decoded['results'] as List<dynamic>? ?? const [];
+      final matches = <MedicationNameMatch>[];
+      for (final raw in results) {
+        if (raw is! Map<String, dynamic>) continue;
+        final verified = raw['approval_status']?.toString() == 'verified' ||
+            raw['approvalStatus']?.toString() == 'verified' ||
+            raw['verified'] == true;
+        final product = _productFromRegistry(raw, clinicallyVerified: verified);
+        if (product == null) continue;
+        matches.add(MedicationNameMatch(
+          name: product.displayName,
+          rxcui: product.rxcui ?? '',
+          score: verified ? 1000 : 800,
+          source: raw['provenance_source']?.toString() ??
+              raw['source']?.toString() ??
+              'Medqur medication registry',
+          product: product,
+          trust: verified
+              ? MedicationResolutionTrust.jamaicaApproved
+              : MedicationResolutionTrust.publicReference,
+        ));
+      }
+      return matches;
+    } on Object {
+      return const [];
+    }
+  }
+
+  Future<List<MedicationNameMatch>> _searchRxNorm(String query) async {
     try {
       final uri = Uri.https(
         'rxnav.nlm.nih.gov',
         '/REST/approximateTerm.json',
-        {'term': value, 'maxEntries': '8', 'option': '1'},
+        {'term': query, 'maxEntries': '8', 'option': '1'},
       );
       final response =
           await _client.get(uri).timeout(const Duration(seconds: 7));
@@ -234,8 +299,10 @@ class MedicationRegistryClient {
       final productJson = decoded['product'] is Map<String, dynamic>
           ? decoded['product'] as Map<String, dynamic>
           : decoded;
-      final verified =
-          decoded['verified'] == true || productJson['verified'] == true;
+      final verified = decoded['verified'] == true ||
+          productJson['verified'] == true ||
+          productJson['approval_status']?.toString() == 'verified' ||
+          productJson['approvalStatus']?.toString() == 'verified';
       final product = _productFromRegistry(
         productJson,
         clinicallyVerified: verified,
@@ -251,8 +318,8 @@ class MedicationRegistryClient {
             'Configured Medqur medication registry',
         message: decoded['message']?.toString() ??
             (verified
-                ? 'Product identity verified by the configured approved medication registry.'
-                : 'Registry returned a product reference, but it is not marked clinically verified.'),
+                ? 'Medication identified and verified by the configured approved medication registry.'
+                : 'Medication identified by the registry, but it is not marked clinically verified yet.'),
         onlineLookup: true,
       );
     } on Object {
@@ -287,7 +354,7 @@ class MedicationRegistryClient {
           trust: MedicationResolutionTrust.publicReference,
           source: 'openFDA NDC Directory',
           message:
-              'UPC matched the public FDA NDC Directory. This is reference data, not Jamaica formulary approval or a substitute for pharmacist verification.',
+              'Medication package matched the public FDA NDC Directory. This identifies the product for reference but does not establish Jamaica formulary approval.',
           onlineLookup: true,
         );
       } on Object {
@@ -323,18 +390,45 @@ class MedicationRegistryClient {
         json['brand_name']?.toString() ??
         '';
     if (generic.isEmpty && brand.isEmpty) return null;
+
     final gtins = <String>[];
     final rawGtins = json['gtins'];
     if (rawGtins is List) {
       for (final value in rawGtins) {
         final gtin = value.toString();
-        if (gtin.isNotEmpty) gtins.add(gtin);
+        if (gtin.isNotEmpty && !gtins.contains(gtin)) gtins.add(gtin);
+      }
+    }
+    final identifiers = json['identifiers'];
+    if (identifiers is List) {
+      for (final value in identifiers) {
+        if (value is! Map) continue;
+        final gtin = value['gtin14']?.toString();
+        if (gtin != null && gtin.isNotEmpty && !gtins.contains(gtin)) {
+          gtins.add(gtin);
+        }
       }
     }
     final single = json['gtin']?.toString();
     if (single != null && single.isNotEmpty && !gtins.contains(single)) {
       gtins.add(single);
     }
+
+    final ingredientNames = <String>[];
+    final rawIngredients = json['ingredients'];
+    if (rawIngredients is List) {
+      for (final value in rawIngredients) {
+        if (value is Map) {
+          final name = value['name']?.toString() ??
+              value['ingredient_name']?.toString();
+          if (name != null && name.isNotEmpty) ingredientNames.add(name);
+        } else {
+          final name = value.toString();
+          if (name.isNotEmpty) ingredientNames.add(name);
+        }
+      }
+    }
+
     return MedicationProduct(
       id: json['id']?.toString() ??
           'REGISTRY-${gtins.isEmpty ? brand : gtins.first}',
@@ -345,16 +439,28 @@ class MedicationRegistryClient {
           json['dosage_form']?.toString() ??
           '',
       manufacturer: json['manufacturer']?.toString() ?? '',
+      importer: json['importer']?.toString(),
       source: clinicallyVerified
           ? MedicationProductSource.jamaicaApproved
           : MedicationProductSource.publicReference,
-      packageDescription: json['packageDescription']?.toString(),
+      packageDescription: json['packageDescription']?.toString() ??
+          json['package_description']?.toString(),
       gtins: gtins,
       rxcui: json['rxcui']?.toString(),
       ndc: json['ndc']?.toString(),
       clinicallyVerified: clinicallyVerified,
       jamaicaReference: json['jamaicaReference']?.toString() ??
-          json['provenanceReference']?.toString(),
+          json['provenanceReference']?.toString() ??
+          json['provenance_reference']?.toString(),
+      therapeuticCategory: json['therapeuticCategory']?.toString() ??
+          json['therapeutic_category']?.toString(),
+      prescriptionStatus: json['prescriptionStatus']?.toString() ??
+          json['prescription_status']?.toString(),
+      ingredients: ingredientNames,
+      formularyStatus: json['formularyStatus']?.toString() ??
+          json['formulary_status']?.toString(),
+      approvalStatus: json['approvalStatus']?.toString() ??
+          json['approval_status']?.toString(),
     );
   }
 
@@ -394,6 +500,8 @@ class MedicationRegistryClient {
       gtins: scannedGtin == null ? const [] : [scannedGtin],
       ndc: json['product_ndc']?.toString() ?? packageNdc,
       clinicallyVerified: false,
+      ingredients: ingredientNames,
+      prescriptionStatus: json['marketing_category']?.toString(),
     );
   }
 }
