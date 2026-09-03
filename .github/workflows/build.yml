@@ -47,6 +47,55 @@ jobs:
           done
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT count(*) AS medication_tables FROM information_schema.tables WHERE table_schema='public';"
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT facility_id, code, name FROM inventory_locations;"
+          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT generic_name, brand_name, approval_status FROM medication_products ORDER BY generic_name;"
+
+      - name: Smoke test live medication registry
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://medqur:medqur@127.0.0.1:5432/medqur
+          MEDQUR_DEV_AUTH: "true"
+          PORT: "8080"
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx src/server.ts >/tmp/medqur-backend.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true; cat /tmp/medqur-backend.log || true' EXIT
+
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/health >/tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/health.json
+
+          curl --fail --silent \
+            'http://127.0.0.1:8080/v1/medications/resolve?gtin=18904215101509' \
+            >/tmp/neurobalin.json
+          cat /tmp/neurobalin.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/neurobalin.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          assert payload['found'] is True, payload
+          product = payload['product']
+          assert product['brandName'] == 'Neurobalin-75', product
+          assert product['genericName'] == 'Pregabalin', product
+          assert '18904215101509' in product['gtins'], product
+          PY
+
+          curl --fail --silent \
+            'http://127.0.0.1:8080/v1/medications/search?q=pregabalin' \
+            >/tmp/search.json
+          cat /tmp/search.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/search.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          results = payload['results']
+          assert any(item['brand_name'] == 'Neurobalin-75' for item in results), results
+          PY
 
   android-and-web:
     name: Android + Web
@@ -194,7 +243,7 @@ jobs:
           - **Medqur-Android.apk** — Android release APK.
           - **Medqur-iOS-Unsigned.zip** — unsigned iOS `Runner.app` package. It is not an App Store/TestFlight-signed IPA and cannot be installed normally on an iPhone until it is code-signed.
 
-          V0.9 includes the medication-master/pharmacy platform foundation. Production clinical use still requires approved medication/formulary data, OIDC infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
+          V0.9 includes the medication-master/pharmacy platform foundation and real-package medication scanning improvements. Production clinical use still requires approved medication/formulary data, OIDC infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
           EOF
 
       - name: Replace latest GitHub Release
