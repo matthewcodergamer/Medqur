@@ -58,17 +58,27 @@ CREATE TABLE IF NOT EXISTS medication_identifiers (
 );
 CREATE INDEX IF NOT EXISTS medication_identifiers_gtin_idx ON medication_identifiers(normalized_gtin14);
 
+CREATE TABLE IF NOT EXISTS medication_ingredients (
+  product_id uuid NOT NULL REFERENCES medication_products(id) ON DELETE CASCADE,
+  ingredient_code text NOT NULL,
+  ingredient_name text NOT NULL,
+  coding_system text NOT NULL DEFAULT 'local',
+  strength_text text,
+  PRIMARY KEY(product_id, ingredient_code)
+);
+CREATE INDEX IF NOT EXISTS medication_ingredients_code_idx ON medication_ingredients(ingredient_code);
+
 CREATE TABLE IF NOT EXISTS medication_lots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id uuid NOT NULL REFERENCES medication_products(id),
   lot_number text NOT NULL,
   manufacture_date date,
   expiry_date date,
-  serial_number text,
+  serial_number text NOT NULL DEFAULT '',
   supplier text NOT NULL DEFAULT '',
   provenance_source text NOT NULL DEFAULT 'pharmacy_receiving',
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(product_id, lot_number, COALESCE(serial_number, ''))
+  UNIQUE(product_id, lot_number, serial_number)
 );
 
 CREATE TABLE IF NOT EXISTS inventory_locations (
@@ -99,15 +109,17 @@ CREATE TABLE IF NOT EXISTS pharmacy_receipts (
 );
 
 CREATE TABLE IF NOT EXISTS inventory_balances (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   facility_id text NOT NULL REFERENCES facilities(id),
   location_id uuid NOT NULL REFERENCES inventory_locations(id),
   product_id uuid NOT NULL REFERENCES medication_products(id),
   lot_id uuid REFERENCES medication_lots(id),
   quantity numeric(14,3) NOT NULL DEFAULT 0,
   unit text NOT NULL DEFAULT 'unit',
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (facility_id, location_id, product_id, lot_id)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS inventory_balances_unique_idx
+  ON inventory_balances(facility_id, location_id, product_id, COALESCE(lot_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 CREATE TABLE IF NOT EXISTS patients (
   id text PRIMARY KEY,
