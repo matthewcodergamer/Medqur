@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/medication_identifier.dart';
-import '../services/medication_master.dart';
+import '../services/medication_registry.dart';
 import '../services/nids_identity_gateway.dart';
 import '../services/nids_test_credential.dart';
 import '../widgets/common.dart';
@@ -19,14 +19,23 @@ class ScanPageV2 extends StatefulWidget {
 }
 
 class _ScanPageV2State extends State<ScanPageV2> {
+  final MedicationRegistryClient _medicationRegistry = MedicationRegistryClient();
+
   ScanPurpose purpose = ScanPurpose.patientWristband;
   ScanCapture? capture;
   Patient? matchedPatient;
   NidsTestCredential? nidsTestCredential;
   NidsScanEnvelope? nidsEnvelope;
   MedicationIdentifier? medicationIdentifier;
-  MedicationProduct? medicationProduct;
+  MedicationResolution? medicationResolution;
   String? message;
+  bool resolvingMedication = false;
+
+  @override
+  void dispose() {
+    _medicationRegistry.dispose();
+    super.dispose();
+  }
 
   Future<void> _scan() async {
     final result = await Navigator.of(context).push<ScanCapture>(
@@ -34,11 +43,36 @@ class _ScanPageV2State extends State<ScanPageV2> {
     );
     if (result == null || !mounted) return;
 
+    if (purpose == ScanPurpose.medication) {
+      final parsed = MedicationIdentifierParser.parse(
+        result.value,
+        formatName: result.format.name,
+      );
+      setState(() {
+        capture = result;
+        medicationIdentifier = parsed;
+        medicationResolution = null;
+        matchedPatient = _findMedication(parsed);
+        nidsEnvelope = null;
+        nidsTestCredential = null;
+        resolvingMedication = true;
+        message = 'Code captured. Checking medication registries…';
+      });
+      final resolved = await _medicationRegistry.resolve(parsed);
+      if (!mounted) return;
+      setState(() {
+        medicationResolution = resolved;
+        resolvingMedication = false;
+        message = matchedPatient != null
+            ? 'Medication identifier also matches an active patient order.'
+            : resolved.message;
+      });
+      return;
+    }
+
     Patient? match;
     NidsTestCredential? nidsTest;
     NidsScanEnvelope? identityEnvelope;
-    MedicationIdentifier? medication;
-    MedicationProduct? product;
     String status;
 
     if (purpose == ScanPurpose.patientWristband) {
@@ -46,22 +80,6 @@ class _ScanPageV2State extends State<ScanPageV2> {
       status = match == null
           ? 'Encounter token not found in this device workspace.'
           : 'Patient wristband matched.';
-    } else if (purpose == ScanPurpose.medication) {
-      medication = MedicationIdentifierParser.parse(
-        result.value,
-        formatName: result.format.name,
-      );
-      product = MedicationMasterCatalog.lookup(medication);
-      match = _findMedication(medication);
-      if (match != null) {
-        status = 'Medication identifier matched an active patient order.';
-      } else if (product != null) {
-        status = 'Medication identified in the prototype product master.';
-      } else if (medication.gtin != null) {
-        status = 'GS1 product captured. GTIN parsed, but the product is not in the approved medication master yet.';
-      } else {
-        status = 'Medication code captured. Product identity requires approved master-data verification.';
-      }
     } else if (purpose == ScanPurpose.nidsCard) {
       identityEnvelope = NidsIdentityDecoder.decode(result.value);
       nidsTest = identityEnvelope.testCredential;
@@ -77,10 +95,128 @@ class _ScanPageV2State extends State<ScanPageV2> {
       matchedPatient = match;
       nidsTestCredential = nidsTest;
       nidsEnvelope = identityEnvelope;
-      medicationIdentifier = medication;
-      medicationProduct = product;
+      medicationIdentifier = null;
+      medicationResolution = null;
+      resolvingMedication = false;
       message = status;
     });
+  }
+
+  Future<void> _manualMedicationCode() async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter medication code'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.text,
+          decoration: const InputDecoration(
+            labelText: 'GTIN / UPC / barcode value',
+            hintText: 'e.g. 363824050287',
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Look up'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.isEmpty || !mounted) return;
+    final parsed = MedicationIdentifierParser.parse(value);
+    setState(() {
+      capture = null;
+      medicationIdentifier = parsed;
+      medicationResolution = null;
+      matchedPatient = _findMedication(parsed);
+      resolvingMedication = true;
+      message = 'Checking medication registries…';
+    });
+    final resolved = await _medicationRegistry.resolve(parsed);
+    if (!mounted) return;
+    setState(() {
+      medicationResolution = resolved;
+      resolvingMedication = false;
+      message = resolved.message;
+    });
+  }
+
+  Future<void> _searchMedicationName() async {
+    final controller = TextEditingController();
+    final query = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Search medicine name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Brand or generic name',
+            hintText: 'e.g. pregabalin 75 mg',
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Search'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (query == null || query.isEmpty || !mounted) return;
+
+    final matches = await _medicationRegistry.searchByName(query);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('RxNorm reference search', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              const Text(
+                'Name search is a public terminology fallback. It does not prove that a scanned package is the ordered medicine.',
+                style: TextStyle(color: Color(0xFF65748A), fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              if (matches.isEmpty)
+                const Text('No active RxNorm matches were returned.')
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: matches.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = matches[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.medication_outlined, color: medqurBlue),
+                        title: Text(item.name),
+                        subtitle: Text('RxCUI ${item.rxcui} • ${item.source}'),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Patient? _findEncounter(String raw) {
@@ -118,7 +254,15 @@ class _ScanPageV2State extends State<ScanPageV2> {
 
   @override
   Widget build(BuildContext context) {
-    final verified = matchedPatient != null || nidsTestCredential != null;
+    final resolution = medicationResolution;
+    final medicationApproved = resolution?.approvedForClinicalAutomation == true;
+    final verified = matchedPatient != null || nidsTestCredential != null || medicationApproved;
+    final resultColor = medicationIdentifier != null && !medicationApproved
+        ? (resolution?.found == true ? medqurBlue : medqurAmber)
+        : verified
+            ? medqurGreen
+            : medqurBlue;
+
     return ListView(
       padding: const EdgeInsets.all(22),
       children: [
@@ -138,6 +282,26 @@ class _ScanPageV2State extends State<ScanPageV2> {
           icon: const Icon(Icons.camera_alt_rounded),
           label: Text(purpose.title),
         ),
+        if (purpose == ScanPurpose.medication) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _manualMedicationCode,
+                icon: const Icon(Icons.keyboard_alt_outlined),
+                label: const Text('Enter code'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _searchMedicationName,
+                icon: const Icon(Icons.search_rounded),
+                label: const Text('Search name'),
+              ),
+            ),
+          ]),
+        ],
         if (purpose == ScanPurpose.nidsCard) ...[
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -147,98 +311,93 @@ class _ScanPageV2State extends State<ScanPageV2> {
           ),
         ],
         const SizedBox(height: 18),
-        if (capture != null)
-          SoftCard(
-            highlighted: verified,
-            onTap: matchedPatient == null ? null : () => widget.onOpenPatient(matchedPatient!),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(
-                verified ? Icons.verified_rounded : Icons.qr_code_rounded,
-                color: verified ? medqurGreen : medqurBlue,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message ?? 'Captured',
-                      style: TextStyle(
-                        color: verified ? medqurGreen : medqurInk,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (nidsTestCredential != null) ...[
+        if (resolvingMedication)
+          const SoftCard(
+            child: Row(children: [
+              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)),
+              SizedBox(width: 12),
+              Expanded(child: Text('Checking configured registry and public medication references…')),
+            ]),
+          ),
+        if (capture != null || medicationIdentifier != null)
+          Padding(
+            padding: EdgeInsets.only(top: resolvingMedication ? 10 : 0),
+            child: SoftCard(
+              highlighted: verified,
+              onTap: matchedPatient == null ? null : () => widget.onOpenPatient(matchedPatient!),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(
+                  verified ? Icons.verified_rounded : Icons.qr_code_scanner_rounded,
+                  color: resultColor,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        nidsTestCredential!.fullName,
-                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}',
-                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'TEST ONLY • not NIRA verified',
-                        style: TextStyle(color: medqurRed, fontSize: 10, fontWeight: FontWeight.w800),
-                      ),
-                    ] else if (nidsEnvelope != null) ...[
-                      Text(
-                        nidsEnvelope!.safeLabel,
-                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Credential fingerprint ${nidsEnvelope!.fingerprint}',
-                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Raw NIC data is not trusted for patient autofill until verified by NIRA.',
-                        style: TextStyle(color: medqurAmber, fontSize: 11, fontWeight: FontWeight.w800),
-                      ),
-                    ] else if (medicationIdentifier != null) ...[
-                      Text(
-                        medicationProduct?.displayName ?? medicationIdentifier!.summary,
-                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
-                      ),
-                      if (medicationIdentifier!.gtin != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          medicationIdentifier!.summary,
-                          style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      Text(
-                        medicationProduct != null
-                            ? 'Prototype master-data match'
-                            : 'Pharmacist/master-data verification required before clinical use',
+                        message ?? 'Captured',
                         style: TextStyle(
-                          color: medicationProduct != null ? medqurGreen : medqurAmber,
-                          fontSize: 11,
+                          color: resultColor,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ] else
-                      Text(
-                        matchedPatient?.name ?? capture!.value,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
-                      ),
-                    const SizedBox(height: 3),
-                    Text(
-                      capture!.format.name,
-                      style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      if (nidsTestCredential != null) ...[
+                        Text(
+                          nidsTestCredential!.fullName,
+                          style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}',
+                          style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'TEST ONLY • not NIRA verified',
+                          style: TextStyle(color: medqurRed, fontSize: 10, fontWeight: FontWeight.w800),
+                        ),
+                      ] else if (nidsEnvelope != null) ...[
+                        Text(
+                          nidsEnvelope!.safeLabel,
+                          style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Credential fingerprint ${nidsEnvelope!.fingerprint}',
+                          style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Raw NIC data is not trusted for patient autofill until verified by NIRA.',
+                          style: TextStyle(color: medqurAmber, fontSize: 11, fontWeight: FontWeight.w800),
+                        ),
+                      ] else if (medicationIdentifier != null) ...[
+                        _MedicationResult(
+                          identifier: medicationIdentifier!,
+                          resolution: medicationResolution,
+                        ),
+                      ] else
+                        Text(
+                          matchedPatient?.name ?? capture!.value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
+                        ),
+                      if (capture != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Scanner format: ${capture!.format.name}',
+                          style: const TextStyle(color: Color(0xFF8793A4), fontSize: 10),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              if (matchedPatient != null) const Icon(Icons.chevron_right_rounded),
-            ]),
+                if (matchedPatient != null) const Icon(Icons.chevron_right_rounded),
+              ]),
+            ),
           ),
         const SizedBox(height: 18),
         const SoftCard(
@@ -249,7 +408,7 @@ class _ScanPageV2State extends State<ScanPageV2> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Medication scanning now parses common GS1 identifiers, including GTIN, lot, expiry and serial data when present. Real NIC QR codes can be captured by the camera, but production autofill must use an approved NIRA verification interface instead of trusting unverified QR contents.',
+                  'Medication mode reads GS1 DataMatrix, EAN/UPC and common linear codes, validates GTIN check digits, and extracts GTIN, lot, manufacture/best-before/expiry dates and serial data when encoded. It can query a configured Medqur medication registry and uses openFDA/RxNorm only as public reference fallbacks. Public-reference or observed-package matches do not become clinically approved automatically.',
                 ),
               ),
             ],
@@ -269,8 +428,73 @@ class _ScanPageV2State extends State<ScanPageV2> {
           nidsTestCredential = null;
           nidsEnvelope = null;
           medicationIdentifier = null;
-          medicationProduct = null;
+          medicationResolution = null;
+          resolvingMedication = false;
           message = null;
         }),
       );
+}
+
+class _MedicationResult extends StatelessWidget {
+  const _MedicationResult({required this.identifier, required this.resolution});
+
+  final MedicationIdentifier identifier;
+  final MedicationResolution? resolution;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = resolution?.product;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          product?.displayName ?? identifier.summary,
+          style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w900),
+        ),
+        if (product != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            [
+              if (product.manufacturer.isNotEmpty) product.manufacturer,
+              if (product.dosageForm.isNotEmpty) product.dosageForm,
+              if (product.packageDescription?.isNotEmpty == true) product.packageDescription!,
+            ].join(' • '),
+            style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
+          ),
+        ],
+        const SizedBox(height: 5),
+        Text(
+          identifier.summary,
+          style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
+        ),
+        if (resolution != null) ...[
+          const SizedBox(height: 7),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            StatusPill(
+              label: resolution!.trustLabel,
+              color: resolution!.approvedForClinicalAutomation
+                  ? medqurGreen
+                  : resolution!.found
+                      ? medqurBlue
+                      : medqurAmber,
+            ),
+            if (resolution!.onlineLookup)
+              const StatusPill(label: 'Online lookup', color: medqurBlue),
+          ]),
+          const SizedBox(height: 5),
+          Text(
+            'Source: ${resolution!.source}',
+            style: const TextStyle(color: Color(0xFF8793A4), fontSize: 10),
+          ),
+          if (product?.jamaicaReference?.isNotEmpty == true) ...[
+            const SizedBox(height: 4),
+            Text(
+              product!.jamaicaReference!,
+              style: const TextStyle(color: medqurBlue, fontSize: 10, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
 }
