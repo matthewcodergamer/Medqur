@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show KeyEventResult;
 
 /// Collects characters from USB/Bluetooth/Zebra/Honeywell scanners configured
 /// in keyboard-wedge mode. Most devices terminate a scan with Enter.
