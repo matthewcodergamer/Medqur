@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medqur/models.dart';
 import 'package:medqur/services/medication_identifier.dart';
+import 'package:medqur/services/medication_master.dart';
 import 'package:medqur/services/medication_safety.dart';
 
 void main() {
@@ -13,6 +14,7 @@ void main() {
 
       expect(result.isGs1, isTrue);
       expect(result.gtin, '09506000134352');
+      expect(result.gtinCheckDigitValid, isTrue);
       expect(result.lotNumber, 'LOT123');
       expect(result.serialNumber, 'SERIAL9');
       expect(result.expiryDate, DateTime(2027, 12, 31));
@@ -30,14 +32,69 @@ void main() {
       expect(result.expiryDate, DateTime(2027, 12, 31));
     });
 
+    test('parses manufacture and expiry fields from a healthcare package', () {
+      final result = MedicationIdentifierParser.parse(
+        '(01)18904215101509(11)250301(17)270200(10)NBA7002(21)NBA7002002985',
+        formatName: 'dataMatrix',
+      );
+
+      expect(result.gtin, '18904215101509');
+      expect(result.gtinCheckDigitValid, isTrue);
+      expect(result.manufactureDate, DateTime(2025, 3, 1));
+      expect(result.expiryDate, DateTime(2027, 2, 28));
+      expect(result.lotNumber, 'NBA7002');
+      expect(result.serialNumber, 'NBA7002002985');
+    });
+
     test('normalises EAN/UPC values to GTIN-14', () {
       final result = MedicationIdentifierParser.parse(
-        '1234567890128',
+        '8906102700515',
         formatName: 'ean13',
       );
 
-      expect(result.gtin, '01234567890128');
+      expect(result.gtin, '08906102700515');
+      expect(result.gtinCheckDigitValid, isTrue);
       expect(result.isGs1, isTrue);
+    });
+
+    test('flags an invalid GTIN check digit', () {
+      final result = MedicationIdentifierParser.parse(
+        '8906102700514',
+        formatName: 'ean13',
+      );
+      expect(result.gtinCheckDigitValid, isFalse);
+    });
+  });
+
+  group('MedicationMasterCatalog observed package fixtures', () {
+    test('matches Neurobalin-75 DataMatrix GTIN from prototype package', () {
+      final identifier = MedicationIdentifierParser.parse(
+        '(01)18904215101509(17)270200(10)NBA7002(21)NBA7002002985',
+        formatName: 'dataMatrix',
+      );
+      final product = MedicationMasterCatalog.lookup(identifier);
+      expect(product?.brandName, 'Neurobalin-75');
+      expect(product?.genericName, 'Pregabalin');
+      expect(product?.clinicallyVerified, isFalse);
+    });
+
+    test('matches CEFUR EAN-13 from prototype package', () {
+      final identifier = MedicationIdentifierParser.parse(
+        '8906102700515',
+        formatName: 'ean13',
+      );
+      final product = MedicationMasterCatalog.lookup(identifier);
+      expect(product?.brandName, 'CEFUR');
+      expect(product?.genericName, 'Cefuroxime axetil');
+    });
+
+    test('matches Mucinex DM UPC from prototype package', () {
+      final identifier = MedicationIdentifierParser.parse(
+        '363824050287',
+        formatName: 'upcA',
+      );
+      final product = MedicationMasterCatalog.lookup(identifier);
+      expect(product?.brandName, 'Mucinex DM Maximum Strength');
     });
   });
 
@@ -103,6 +160,25 @@ void main() {
 
       expect(result.allowed, isFalse);
       expect(result.blockers.join(' '), contains('GTIN'));
+    });
+
+    test('blocks an invalid GTIN even if a package is otherwise scanned', () {
+      const order = MedicationOrder(
+        name: 'Test drug',
+        dose: '1 tablet',
+        route: 'Oral',
+        frequency: 'Once',
+        orderedBy: 'Dr Test',
+        productCode: '8906102700514',
+      );
+      final scan = MedicationIdentifierParser.parse('8906102700514');
+      final result = MedicationSafetyEngine.evaluate(
+        patient: patient(),
+        order: order,
+        scan: scan,
+      );
+      expect(result.allowed, isFalse);
+      expect(result.blockers.join(' '), contains('check digit'));
     });
 
     test('blocks an expired scanned medication', () {
