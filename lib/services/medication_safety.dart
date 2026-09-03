@@ -29,11 +29,18 @@ class MedicationSafetyEngine {
       blockers.add('This medication order is already recorded as administered.');
     }
 
+    if (scan.gtin != null && scan.gtinCheckDigitValid == false) {
+      blockers.add('The scanned GTIN failed its GS1 check digit. Re-scan the medication package.');
+    }
+
     final mappedRaw = order.productCode;
     if (mappedRaw == null || mappedRaw.isEmpty) {
       blockers.add('The order does not have an approved medication product identifier mapped.');
     } else {
       final mapped = MedicationIdentifierParser.parse(mappedRaw);
+      if (mapped.gtin != null && mapped.gtinCheckDigitValid == false) {
+        blockers.add('The product identifier mapped to this order has an invalid GTIN check digit.');
+      }
       if (mapped.gtin != null && scan.gtin != null) {
         if (mapped.gtin != scan.gtin) {
           blockers.add('Wrong medication product: scanned GTIN does not match the signed order.');
