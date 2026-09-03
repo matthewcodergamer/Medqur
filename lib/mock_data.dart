@@ -46,6 +46,15 @@ const demoNurse = StaffProfile(
   facilities: facilities,
 );
 
+const demoPharmacist = StaffProfile(
+  id: 'MQ-5PHR-90RX',
+  name: 'Pharmacist Jordan Reid',
+  role: StaffRole.pharmacist,
+  title: 'Hospital Pharmacist',
+  registration: 'PHR-DEMO-2049',
+  facilities: facilities,
+);
+
 List<Patient> buildDemoPatients() => [
       Patient(
         id: 'MQP-208491',
