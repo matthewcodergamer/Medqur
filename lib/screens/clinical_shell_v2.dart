@@ -5,6 +5,7 @@ import 'new_encounter_page_v2.dart';
 import 'orders_tasks_page.dart';
 import 'patient_detail_page_v2.dart';
 import 'patient_queue_page.dart';
+import 'pharmacy_page.dart';
 import 'profile_page_v2.dart';
 import 'scan_page_v2.dart';
 
@@ -31,13 +32,19 @@ class ClinicalShellV2 extends StatefulWidget {
 class _ClinicalShellV2State extends State<ClinicalShellV2> {
   int index = 0;
   bool get isDoctor => widget.staff.role == StaffRole.doctor;
+  bool get isNurse => widget.staff.role == StaffRole.nurse;
+  bool get isPharmacist => widget.staff.role == StaffRole.pharmacist;
 
   List<_NavItem> get items => [
         const _NavItem('Patients', Icons.people_alt_outlined),
         const _NavItem('Scan', Icons.qr_code_scanner_rounded),
         _NavItem(
-          isDoctor ? 'Orders' : 'Tasks',
-          isDoctor ? Icons.receipt_long_outlined : Icons.medical_services_outlined,
+          isDoctor ? 'Orders' : isPharmacist ? 'Pharmacy' : 'Tasks',
+          isDoctor
+              ? Icons.receipt_long_outlined
+              : isPharmacist
+                  ? Icons.local_pharmacy_outlined
+                  : Icons.medical_services_outlined,
         ),
         const _NavItem('Profile', Icons.badge_outlined),
       ];
@@ -60,6 +67,7 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   }
 
   Future<void> newEncounter() async {
+    if (isPharmacist) return;
     final patient = await Navigator.of(context).push<Patient>(
       MaterialPageRoute(
         builder: (_) => NewEncounterPageV2(
@@ -84,7 +92,9 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
         1 => ScanPageV2(patients: widget.patients, onOpenPatient: openPatient),
         2 => isDoctor
             ? OrdersPage(patients: widget.patients, onOpenPatient: openPatient)
-            : NurseTasksPage(patients: widget.patients, onOpenPatient: openPatient),
+            : isPharmacist
+                ? PharmacyPage(staff: widget.staff, facility: widget.facility)
+                : NurseTasksPage(patients: widget.patients, onOpenPatient: openPatient),
         _ => ProfilePageV2(
             staff: widget.staff,
             facility: widget.facility,
@@ -185,7 +195,7 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Active shift • V0.6 • ${widget.facility.classification.shortLabel} • P1–P4 triage • Print V1',
+                  'Active shift • V0.9 • ${widget.facility.classification.shortLabel} • medication master + pharmacy sync',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF78869A), fontSize: 11),
