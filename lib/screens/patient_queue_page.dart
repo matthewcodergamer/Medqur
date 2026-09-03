@@ -22,6 +22,7 @@ class PatientQueuePage extends StatelessWidget {
       ..sort((a, b) => a.triage.index.compareTo(b.triage.index));
     final p1Count = active.where((p) => p.triage == TriageLevel.critical).length;
     final p2Count = active.where((p) => p.triage == TriageLevel.urgent).length;
+    final canCreateEncounter = staff.role == StaffRole.doctor || staff.role == StaffRole.nurse;
 
     return ListView(
       padding: const EdgeInsets.all(22),
@@ -34,7 +35,11 @@ class PatientQueuePage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      staff.role == StaffRole.doctor ? 'My patient queue' : 'Patient flow',
+                      staff.role == StaffRole.doctor
+                          ? 'My patient queue'
+                          : staff.role == StaffRole.pharmacist
+                              ? 'Clinical patient reference'
+                              : 'Patient flow',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 6),
@@ -42,11 +47,12 @@ class PatientQueuePage extends StatelessWidget {
                   ],
                 ),
               ),
-              FilledButton.tonalIcon(
-                onPressed: onNewEncounter,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('New encounter'),
-              ),
+              if (canCreateEncounter)
+                FilledButton.tonalIcon(
+                  onPressed: onNewEncounter,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('New encounter'),
+                ),
             ],
           ),
         ),
@@ -93,9 +99,11 @@ class PatientQueuePage extends StatelessWidget {
         const SizedBox(height: 24),
         const SectionTitle('Priority list'),
         const SizedBox(height: 6),
-        const Text(
-          'P1 appears first, followed by P2, P3 and P4. Clinical teams remain responsible for reassessment and escalation.',
-          style: TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.35),
+        Text(
+          staff.role == StaffRole.pharmacist
+              ? 'Pharmacists can review patient context for medication workflow, but encounter creation and triage remain clinical registration/nursing/medical actions.'
+              : 'P1 appears first, followed by P2, P3 and P4. Clinical teams remain responsible for reassessment and escalation.',
+          style: const TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.35),
         ),
         const SizedBox(height: 12),
         ...active.map(
