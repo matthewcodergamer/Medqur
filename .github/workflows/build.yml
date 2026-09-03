@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Pharmacy backend
+    name: Pharmacy + staff identity backend
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
         working-directory: backend
         run: npm run typecheck
 
-      - name: Start PostgreSQL and apply medication schema
+      - name: Start PostgreSQL and apply clinical schemas
         working-directory: backend
         run: |
           docker compose up -d postgres
@@ -45,9 +45,10 @@ jobs:
             fi
             sleep 2
           done
-          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT count(*) AS medication_tables FROM information_schema.tables WHERE table_schema='public';"
+          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT count(*) AS medqur_tables FROM information_schema.tables WHERE table_schema='public';"
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT facility_id, code, name FROM inventory_locations;"
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT generic_name, brand_name, approval_status FROM medication_products ORDER BY generic_name;"
+          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT staff_number, display_name FROM staff_accounts ORDER BY staff_number;"
 
       - name: Smoke test live medication registry
         working-directory: backend
@@ -95,6 +96,91 @@ jobs:
               payload = json.load(handle)
           results = payload['results']
           assert any(item['brand_name'] == 'Neurobalin-75' for item in results), results
+          PY
+
+      - name: Smoke test signed staff ID credentials
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://medqur:medqur@127.0.0.1:5432/medqur
+          MEDQUR_DEV_AUTH: "true"
+          IDENTITY_PORT: "8081"
+          MEDQUR_STAFF_BADGE_KEY_ID: "ci-staff-badge-v1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm ED25519 -out /tmp/medqur-staff-badge.pem
+          export MEDQUR_STAFF_BADGE_SIGNING_PRIVATE_KEY_PEM="$(cat /tmp/medqur-staff-badge.pem)"
+
+          npx tsx src/identity_server.ts >/tmp/medqur-identity.log 2>&1 &
+          IDENTITY_PID=$!
+          trap 'kill $IDENTITY_PID 2>/dev/null || true; cat /tmp/medqur-identity.log || true' EXIT
+
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8081/health >/tmp/identity-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/identity-health.json
+
+          curl --fail --silent \
+            -H 'Content-Type: application/json' \
+            -H 'x-medqur-staff-id: 900001' \
+            -H 'x-medqur-role: administrator' \
+            -H 'x-medqur-facility: MRH' \
+            -d '{"staffNumber":"482731","validDays":365}' \
+            http://127.0.0.1:8081/v1/staff/credentials/issue \
+            >/tmp/issued-badge.json
+          cat /tmp/issued-badge.json
+
+          TOKEN="$(python3 - <<'PY'
+          import json
+          with open('/tmp/issued-badge.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          badge = payload['badge']
+          assert badge['staffNumber'] == '482731', badge
+          token = badge['token']
+          assert token.startswith('MQW1.'), token
+          print(token)
+          PY
+          )"
+
+          python3 - "$TOKEN" <<'PY' >/tmp/verify-body.json
+          import json, sys
+          print(json.dumps({'token': sys.argv[1]}))
+          PY
+
+          curl --fail --silent \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/verify-body.json \
+            http://127.0.0.1:8081/v1/public/staff-badge/verify \
+            >/tmp/verified-badge.json
+          cat /tmp/verified-badge.json
+
+          python3 - <<'PY'
+          import json
+          with open('/tmp/verified-badge.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          assert payload['valid'] is True, payload
+          staff = payload['staff']
+          assert staff['staffNumber'] == '482731', staff
+          assert staff['displayName'] == 'Dr. Maya Brown', staff
+          assert any(item['role'] == 'doctor' for item in staff['permissions']), staff
+          PY
+
+          curl --fail --silent \
+            -H 'x-medqur-staff-id: 482731' \
+            -H 'x-medqur-role: doctor' \
+            -H 'x-medqur-facility: MRH' \
+            http://127.0.0.1:8081/v1/staff/badge \
+            >/tmp/my-badge.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/my-badge.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          badge = payload['badge']
+          assert badge['staffNumber'] == '482731', badge
+          assert badge['token'].startswith('MQW1.'), badge
           PY
 
   android-and-web:
@@ -243,7 +329,7 @@ jobs:
           - **Medqur-Android.apk** — Android release APK.
           - **Medqur-iOS-Unsigned.zip** — unsigned iOS `Runner.app` package. It is not an App Store/TestFlight-signed IPA and cannot be installed normally on an iPhone until it is code-signed.
 
-          V0.9 includes the medication-master/pharmacy platform foundation and real-package medication scanning improvements. Production clinical use still requires approved medication/formulary data, OIDC infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
+          V0.10 adds unique six-digit health-worker IDs and cryptographically signed/revocable staff QR credentials alongside the medication-master/pharmacy foundation and real-package scanning. Production clinical use still requires approved medication/formulary data, production OIDC/passkey infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
           EOF
 
       - name: Replace latest GitHub Release
