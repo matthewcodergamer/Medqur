@@ -23,6 +23,7 @@ class _SignInScreenState extends State<SignInScreen> {
     final id = input.trim().toUpperCase();
     if (id == demoDoctor.id) return demoDoctor;
     if (id == demoNurse.id) return demoNurse;
+    if (id == demoPharmacist.id) return demoPharmacist;
     return null;
   }
 
@@ -79,13 +80,9 @@ class _SignInScreenState extends State<SignInScreen> {
     if (capture == null || !mounted) return;
 
     var value = capture.value.trim();
-
-    // Current compact badge format. It produces a materially simpler QR than
-    // the old medqur://staff/... URI.
     if (value.toUpperCase().startsWith('MQS|')) {
       value = value.substring(4);
     } else {
-      // Backward compatibility with already-printed prototype staff badges.
       final uri = Uri.tryParse(value);
       if (uri != null &&
           uri.scheme == 'medqur' &&
@@ -157,20 +154,12 @@ class _SignInScreenState extends State<SignInScreen> {
                             const SizedBox(height: 8),
                             const Row(
                               children: [
-                                Icon(
-                                  Icons.health_and_safety_outlined,
-                                  size: 15,
-                                  color: medqurGreen,
-                                ),
+                                Icon(Icons.health_and_safety_outlined, size: 15, color: medqurGreen),
                                 SizedBox(width: 7),
                                 Expanded(
                                   child: Text(
                                     'Jamaica • healthcare staff access',
-                                    style: TextStyle(
-                                      color: Color(0xFF748297),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: TextStyle(color: Color(0xFF748297), fontSize: 12, fontWeight: FontWeight.w600),
                                   ),
                                 ),
                               ],
@@ -182,21 +171,13 @@ class _SignInScreenState extends State<SignInScreen> {
                       const FadeSlideIn(
                         child: Text(
                           'Sign in',
-                          style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            color: medqurInk,
-                            letterSpacing: -1,
-                          ),
+                          style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: medqurInk, letterSpacing: -1),
                         ),
                       ),
                       const SizedBox(height: 7),
                       const Text(
                         'Enter your staff ID, then verify on this device.',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF65748A),
-                        ),
+                        style: TextStyle(fontSize: 15, color: Color(0xFF65748A)),
                       ),
                       const SizedBox(height: 24),
                       TextField(
@@ -212,14 +193,23 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: () => setState(
-                            () => _controller.text = demoDoctor.id,
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          TextButton(
+                            onPressed: () => setState(() => _controller.text = demoDoctor.id),
+                            child: const Text('Demo doctor'),
                           ),
-                          child: const Text('Use demo ID'),
-                        ),
+                          TextButton(
+                            onPressed: () => setState(() => _controller.text = demoNurse.id),
+                            child: const Text('Demo nurse'),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(() => _controller.text = demoPharmacist.id),
+                            child: const Text('Demo pharmacist'),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       FilledButton.icon(
@@ -228,15 +218,10 @@ class _SignInScreenState extends State<SignInScreen> {
                             ? const SizedBox(
                                 width: 19,
                                 height: 19,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.2,
-                                  color: Colors.white,
-                                ),
+                                child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                               )
                             : const Icon(Icons.fingerprint_rounded),
-                        label: Text(
-                          _authenticating ? 'Verifying…' : 'Verify & continue',
-                        ),
+                        label: Text(_authenticating ? 'Verifying…' : 'Verify & continue'),
                       ),
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
@@ -247,28 +232,18 @@ class _SignInScreenState extends State<SignInScreen> {
                           minimumSize: const Size(0, 52),
                           foregroundColor: medqurInk,
                           side: const BorderSide(color: medqurLine),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
                       const SizedBox(height: 20),
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.lock_outline_rounded,
-                            color: medqurGreen,
-                            size: 16,
-                          ),
+                          Icon(Icons.lock_outline_rounded, color: medqurGreen, size: 16),
                           SizedBox(width: 6),
                           Text(
                             'Prototype data only',
-                            style: TextStyle(
-                              color: Color(0xFF8793A4),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(color: Color(0xFF8793A4), fontSize: 12, fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
