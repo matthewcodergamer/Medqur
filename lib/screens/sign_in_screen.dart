@@ -264,7 +264,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         keyboardType: TextInputType.number,
                         autocorrect: false,
                         enableSuggestions: false,
-                        inputFormatters: const [
+                        inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(6),
                         ],
