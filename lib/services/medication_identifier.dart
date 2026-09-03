@@ -78,6 +78,32 @@ class MedicationIdentifierParser {
   const MedicationIdentifierParser._();
 
   static const String _groupSeparator = '\u001d';
+  static const Map<String, int> _monthNumbers = {
+    'JAN': 1,
+    'JANUARY': 1,
+    'FEB': 2,
+    'FEBRUARY': 2,
+    'MAR': 3,
+    'MARCH': 3,
+    'APR': 4,
+    'APRIL': 4,
+    'MAY': 5,
+    'JUN': 6,
+    'JUNE': 6,
+    'JUL': 7,
+    'JULY': 7,
+    'AUG': 8,
+    'AUGUST': 8,
+    'SEP': 9,
+    'SEPT': 9,
+    'SEPTEMBER': 9,
+    'OCT': 10,
+    'OCTOBER': 10,
+    'NOV': 11,
+    'NOVEMBER': 11,
+    'DEC': 12,
+    'DECEMBER': 12,
+  };
 
   static MedicationIdentifier parse(
     String raw, {
@@ -91,6 +117,23 @@ class MedicationIdentifierParser {
     if (value.length >= 3 && value.startsWith(']')) {
       final prefix = value.substring(0, 3).toLowerCase();
       if (prefix == ']d2' || prefix == ']c1') value = value.substring(3);
+    }
+
+    // Some pharmaceutical DataMatrix symbols in the field decode to a
+    // human-readable AI representation instead of the raw FNC1 stream, e.g.
+    // [01]:18904215101509[10]:NBA7002[11]:MAR.2025[17]:FEB.2027[21]:...
+    // This is not the canonical GS1 element-string representation, but it still
+    // contains deterministic application identifiers. Parse it before falling
+    // back to the standard GS1 forms so the package can actually be resolved.
+    final bracketed = _parseBracketedHri(value);
+    if (bracketed.isNotEmpty) {
+      return _fromAis(
+        original,
+        bracketed,
+        kind: lowerFormat.contains('matrix')
+            ? MedicationCodeKind.gs1DataMatrix
+            : MedicationCodeKind.gs1Linear,
+      );
     }
 
     final parenthesized = _parseParenthesizedGs1(value);
@@ -153,6 +196,75 @@ class MedicationIdentifierParser {
       serialNumber: ais['21'],
       applicationIdentifiers: Map.unmodifiable(ais),
     );
+  }
+
+  static Map<String, String> _parseBracketedHri(String value) {
+    final matches = RegExp(r'\[(\d{2,4})\]\s*:?\s*').allMatches(value).toList();
+    if (matches.isEmpty) return const {};
+
+    final result = <String, String>{};
+    for (var i = 0; i < matches.length; i++) {
+      final match = matches[i];
+      final ai = match.group(1)!;
+      final start = match.end;
+      final end = i + 1 < matches.length ? matches[i + 1].start : value.length;
+      var data = value.substring(start, end).trim();
+      if (data.endsWith(_groupSeparator)) {
+        data = data.substring(0, data.length - 1).trim();
+      }
+      if (data.isEmpty) continue;
+
+      if (ai == '01') {
+        final digits = data.replaceAll(RegExp(r'\D'), '');
+        if (digits.length == 14) result[ai] = digits;
+        continue;
+      }
+      if (const {'11', '15', '17'}.contains(ai)) {
+        final normalizedDate = _normalizeHumanDate(data, ai: ai);
+        if (normalizedDate != null) result[ai] = normalizedDate;
+        continue;
+      }
+      result[ai] = data;
+    }
+
+    return result.containsKey('01') ? result : const {};
+  }
+
+  static String? _normalizeHumanDate(String value, {required String ai}) {
+    final cleaned = value.trim().toUpperCase();
+    if (RegExp(r'^\d{6}$').hasMatch(cleaned)) return cleaned;
+
+    final isoMonth = RegExp(r'^(\d{4})[-/.](\d{1,2})$').firstMatch(cleaned);
+    if (isoMonth != null) {
+      final year = int.parse(isoMonth.group(1)!);
+      final month = int.parse(isoMonth.group(2)!);
+      if (month < 1 || month > 12) return null;
+      final day = ai == '11' ? 1 : 0;
+      return '${(year % 100).toString().padLeft(2, '0')}${month.toString().padLeft(2, '0')}${day.toString().padLeft(2, '0')}';
+    }
+
+    final monthYear = RegExp(r'^([A-Z]{3,9})[\s./-]*(\d{4})$').firstMatch(cleaned);
+    if (monthYear != null) {
+      final month = _monthNumbers[monthYear.group(1)!];
+      final year = int.parse(monthYear.group(2)!);
+      if (month == null) return null;
+      // Manufacture month is represented as the first day when the package only
+      // prints month/year. Expiry/best-before use GS1 day 00, which resolves to
+      // the final day of that month in _parseGs1Date.
+      final day = ai == '11' ? 1 : 0;
+      return '${(year % 100).toString().padLeft(2, '0')}${month.toString().padLeft(2, '0')}${day.toString().padLeft(2, '0')}';
+    }
+
+    final slashMonthYear = RegExp(r'^(\d{1,2})[/-](\d{4})$').firstMatch(cleaned);
+    if (slashMonthYear != null) {
+      final month = int.parse(slashMonthYear.group(1)!);
+      final year = int.parse(slashMonthYear.group(2)!);
+      if (month < 1 || month > 12) return null;
+      final day = ai == '11' ? 1 : 0;
+      return '${(year % 100).toString().padLeft(2, '0')}${month.toString().padLeft(2, '0')}${day.toString().padLeft(2, '0')}';
+    }
+
+    return null;
   }
 
   static Map<String, String> _parseParenthesizedGs1(String value) {
