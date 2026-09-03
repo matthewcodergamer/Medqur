@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../models.dart';
+import '../services/medication_identifier.dart';
+import '../services/medication_master.dart';
+import '../services/nids_identity_gateway.dart';
 import '../services/nids_test_credential.dart';
 import '../widgets/common.dart';
 import 'live_scanner_page.dart';
@@ -19,32 +23,62 @@ class _ScanPageV2State extends State<ScanPageV2> {
   ScanCapture? capture;
   Patient? matchedPatient;
   NidsTestCredential? nidsTestCredential;
+  NidsScanEnvelope? nidsEnvelope;
+  MedicationIdentifier? medicationIdentifier;
+  MedicationProduct? medicationProduct;
   String? message;
 
   Future<void> _scan() async {
-    final result = await Navigator.of(context).push<ScanCapture>(MaterialPageRoute(builder: (_) => LiveScannerPage(purpose: purpose)));
+    final result = await Navigator.of(context).push<ScanCapture>(
+      MaterialPageRoute(builder: (_) => LiveScannerPage(purpose: purpose)),
+    );
     if (result == null || !mounted) return;
+
     Patient? match;
     NidsTestCredential? nidsTest;
+    NidsScanEnvelope? identityEnvelope;
+    MedicationIdentifier? medication;
+    MedicationProduct? product;
     String status;
+
     if (purpose == ScanPurpose.patientWristband) {
       match = _findEncounter(result.value);
-      status = match == null ? 'Encounter token not found in this device workspace.' : 'Patient wristband matched.';
+      status = match == null
+          ? 'Encounter token not found in this device workspace.'
+          : 'Patient wristband matched.';
     } else if (purpose == ScanPurpose.medication) {
-      match = _findMedication(result.value);
-      status = match == null ? 'Barcode captured. It is not mapped to an active medication order here.' : 'Medication barcode matched an active order.';
+      medication = MedicationIdentifierParser.parse(
+        result.value,
+        formatName: result.format.name,
+      );
+      product = MedicationMasterCatalog.lookup(medication);
+      match = _findMedication(medication);
+      if (match != null) {
+        status = 'Medication identifier matched an active patient order.';
+      } else if (product != null) {
+        status = 'Medication identified in the prototype product master.';
+      } else if (medication.gtin != null) {
+        status = 'GS1 product captured. GTIN parsed, but the product is not in the approved medication master yet.';
+      } else {
+        status = 'Medication code captured. Product identity requires approved master-data verification.';
+      }
     } else if (purpose == ScanPurpose.nidsCard) {
-      nidsTest = NidsTestCredential.tryParse(result.value);
-      status = nidsTest == null
-          ? 'Identity code captured, but it is not a Medqur NIDS TEST credential. NIRA verification is not connected.'
-          : 'Medqur NIDS TEST credential decoded successfully.';
+      identityEnvelope = NidsIdentityDecoder.decode(result.value);
+      nidsTest = identityEnvelope.testCredential;
+      status = nidsTest != null
+          ? 'Medqur NIDS TEST credential decoded successfully.'
+          : 'NIC QR captured successfully. Real patient autofill is locked until an approved NIRA verification gateway confirms this credential.';
     } else {
       status = 'Staff credential captured.';
     }
+
     setState(() {
       capture = result;
       matchedPatient = match;
       nidsTestCredential = nidsTest;
+      nidsEnvelope = identityEnvelope;
+      medicationIdentifier = medication;
+      medicationProduct = product;
       message = status;
     });
   }
@@ -60,27 +94,37 @@ class _ScanPageV2State extends State<ScanPageV2> {
     return null;
   }
 
-  Patient? _findMedication(String raw) {
+  Patient? _findMedication(MedicationIdentifier scanned) {
     for (final patient in widget.patients) {
       for (final medication in patient.medications) {
-        if (medication.productCode != null && medication.productCode == raw) return patient;
+        final mappedRaw = medication.productCode;
+        if (mappedRaw == null || mappedRaw.isEmpty) continue;
+        final mapped = MedicationIdentifierParser.parse(mappedRaw);
+        if (mapped.gtin != null && scanned.gtin != null) {
+          if (mapped.gtin == scanned.gtin) return patient;
+        } else if (mapped.rawValue == scanned.rawValue) {
+          return patient;
+        }
       }
     }
     return null;
   }
 
   Future<void> _openGenerator() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NidsTestCredentialPage()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NidsTestCredentialPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final verified = matchedPatient != null || nidsTestCredential != null;
     return ListView(
       padding: const EdgeInsets.all(22),
       children: [
         Text('Scan', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 6),
-        const Text('One camera for patient, identity, staff, QR, and medication barcode workflows.'),
+        const Text('One camera for patient, identity, staff, QR, GS1 DataMatrix, and medication barcode workflows.'),
         const SizedBox(height: 18),
         Wrap(spacing: 8, runSpacing: 8, children: [
           _choice('Wristband', ScanPurpose.patientWristband),
@@ -89,7 +133,11 @@ class _ScanPageV2State extends State<ScanPageV2> {
           _choice('Staff ID', ScanPurpose.staffBadge),
         ]),
         const SizedBox(height: 18),
-        FilledButton.icon(onPressed: _scan, icon: const Icon(Icons.camera_alt_rounded), label: Text(purpose.title)),
+        FilledButton.icon(
+          onPressed: _scan,
+          icon: const Icon(Icons.camera_alt_rounded),
+          label: Text(purpose.title),
+        ),
         if (purpose == ScanPurpose.nidsCard) ...[
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -101,51 +149,128 @@ class _ScanPageV2State extends State<ScanPageV2> {
         const SizedBox(height: 18),
         if (capture != null)
           SoftCard(
-            highlighted: matchedPatient != null || nidsTestCredential != null,
+            highlighted: verified,
             onTap: matchedPatient == null ? null : () => widget.onOpenPatient(matchedPatient!),
-            child: Row(children: [
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Icon(
-                matchedPatient != null || nidsTestCredential != null ? Icons.verified_rounded : Icons.qr_code_rounded,
-                color: matchedPatient != null || nidsTestCredential != null ? medqurGreen : medqurBlue,
+                verified ? Icons.verified_rounded : Icons.qr_code_rounded,
+                color: verified ? medqurGreen : medqurBlue,
               ),
               const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  message ?? 'Captured',
-                  style: TextStyle(
-                    color: matchedPatient != null || nidsTestCredential != null ? medqurGreen : medqurInk,
-                    fontWeight: FontWeight.w800,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message ?? 'Captured',
+                      style: TextStyle(
+                        color: verified ? medqurGreen : medqurInk,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (nidsTestCredential != null) ...[
+                      Text(
+                        nidsTestCredential!.fullName,
+                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}',
+                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'TEST ONLY • not NIRA verified',
+                        style: TextStyle(color: medqurRed, fontSize: 10, fontWeight: FontWeight.w800),
+                      ),
+                    ] else if (nidsEnvelope != null) ...[
+                      Text(
+                        nidsEnvelope!.safeLabel,
+                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Credential fingerprint ${nidsEnvelope!.fingerprint}',
+                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Raw NIC data is not trusted for patient autofill until verified by NIRA.',
+                        style: TextStyle(color: medqurAmber, fontSize: 11, fontWeight: FontWeight.w800),
+                      ),
+                    ] else if (medicationIdentifier != null) ...[
+                      Text(
+                        medicationProduct?.displayName ?? medicationIdentifier!.summary,
+                        style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800),
+                      ),
+                      if (medicationIdentifier!.gtin != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          medicationIdentifier!.summary,
+                          style: const TextStyle(color: Color(0xFF65748A), fontSize: 11),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        medicationProduct != null
+                            ? 'Prototype master-data match'
+                            : 'Pharmacist/master-data verification required before clinical use',
+                        style: TextStyle(
+                          color: medicationProduct != null ? medqurGreen : medqurAmber,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ] else
+                      Text(
+                        matchedPatient?.name ?? capture!.value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
+                      ),
+                    const SizedBox(height: 3),
+                    Text(
+                      capture!.format.name,
+                      style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 5),
-                if (nidsTestCredential != null) ...[
-                  Text(nidsTestCredential!.fullName, style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 3),
-                  Text(
-                    'DOB ${nidsTestCredential!.dateOfBirth} • ${nidsTestCredential!.nationalIdNumber}',
-                    style: const TextStyle(color: Color(0xFF65748A), fontSize: 12),
-                  ),
-                  const SizedBox(height: 3),
-                  const Text('TEST ONLY • not NIRA verified', style: TextStyle(color: medqurRed, fontSize: 10, fontWeight: FontWeight.w800)),
-                ] else
-                  Text(matchedPatient?.name ?? capture!.value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF65748A), fontSize: 12)),
-                const SizedBox(height: 3),
-                Text(capture!.format.name, style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11)),
-              ])),
+              ),
               if (matchedPatient != null) const Icon(Icons.chevron_right_rounded),
             ]),
           ),
         const SizedBox(height: 18),
-        const SoftCard(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.info_outline_rounded, color: medqurBlue), SizedBox(width: 12), Expanded(child: Text('The scanner accepts QR codes and standard package barcodes. NIDS TEST QRs are self-contained prototype data only; production identity must be verified by an approved NIRA integration. Medication matches must use an approved drug/product master.'))])),
+        const SoftCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded, color: medqurBlue),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Medication scanning now parses common GS1 identifiers, including GTIN, lot, expiry and serial data when present. Real NIC QR codes can be captured by the camera, but production autofill must use an approved NIRA verification interface instead of trusting unverified QR contents.',
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _choice(String label, ScanPurpose value) => ChoiceChip(label: Text(label), selected: purpose == value, onSelected: (_) => setState(() {
-        purpose = value;
-        capture = null;
-        matchedPatient = null;
-        nidsTestCredential = null;
-        message = null;
-      }));
+  Widget _choice(String label, ScanPurpose value) => ChoiceChip(
+        label: Text(label),
+        selected: purpose == value,
+        onSelected: (_) => setState(() {
+          purpose = value;
+          capture = null;
+          matchedPatient = null;
+          nidsTestCredential = null;
+          nidsEnvelope = null;
+          medicationIdentifier = null;
+          medicationProduct = null;
+          message = null;
+        }),
+      );
 }
