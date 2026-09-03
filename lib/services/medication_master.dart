@@ -22,6 +22,12 @@ class MedicationProduct {
     this.rxcui,
     this.ndc,
     this.jamaicaReference,
+    this.importer,
+    this.therapeuticCategory,
+    this.prescriptionStatus,
+    this.ingredients = const [],
+    this.formularyStatus,
+    this.approvalStatus,
     this.active = true,
     this.clinicallyVerified = false,
   });
@@ -39,6 +45,12 @@ class MedicationProduct {
   final String? rxcui;
   final String? ndc;
   final String? jamaicaReference;
+  final String? importer;
+  final String? therapeuticCategory;
+  final String? prescriptionStatus;
+  final List<String> ingredients;
+  final String? formularyStatus;
+  final String? approvalStatus;
   final bool active;
   final bool clinicallyVerified;
 
@@ -79,6 +91,9 @@ class MedicationMasterCatalog {
       source: MedicationProductSource.observedPackage,
       packageDescription: 'Prescription package observed in Medqur prototype testing',
       gtins: ['18904215101509'],
+      therapeuticCategory: 'Gabapentinoid',
+      prescriptionStatus: 'Prescription only',
+      ingredients: ['Pregabalin'],
       jamaicaReference: 'National Health Fund benefits listing includes NEUROBALIN-75 CAP 75mg',
     ),
     MedicationProduct(
@@ -90,6 +105,9 @@ class MedicationMasterCatalog {
       manufacturer: 'Ryvis Pharma',
       source: MedicationProductSource.observedPackage,
       packageDescription: '10-tablet prescription package observed in Medqur prototype testing',
+      therapeuticCategory: 'Cephalosporin antibiotic',
+      prescriptionStatus: 'Prescription only',
+      ingredients: ['Cefuroxime axetil'],
       // The package carries a GS1 DataMatrix GTIN and a separate EAN-13.
       gtins: ['18906102700512', '08906102700515'],
       rawAliases: ['8906102700515'],
@@ -103,6 +121,8 @@ class MedicationMasterCatalog {
       manufacturer: 'Package manufacturer to be verified by external registry',
       source: MedicationProductSource.observedPackage,
       packageDescription: 'Maximum-strength 12-hour expectorant / cough suppressant package',
+      therapeuticCategory: 'Expectorant / cough suppressant',
+      ingredients: ['Guaifenesin', 'Dextromethorphan HBr'],
       gtins: ['00363824050287'],
       rawAliases: ['363824050287'],
     ),
@@ -115,6 +135,8 @@ class MedicationMasterCatalog {
       manufacturer: 'Prototype only',
       source: MedicationProductSource.prototype,
       packageDescription: 'Prototype unit-dose medication',
+      therapeuticCategory: 'Analgesic / antipyretic',
+      ingredients: ['Paracetamol'],
       rawAliases: ['MEDQUR-DEMO-PARA-500'],
     ),
     MedicationProduct(
@@ -126,6 +148,8 @@ class MedicationMasterCatalog {
       manufacturer: 'Prototype only',
       source: MedicationProductSource.prototype,
       packageDescription: 'Prototype unit-dose medication',
+      therapeuticCategory: 'Penicillin antibiotic',
+      ingredients: ['Amoxicillin'],
       rawAliases: ['MEDQUR-DEMO-AMOX-500'],
     ),
   ];
@@ -144,10 +168,49 @@ class MedicationMasterCatalog {
     return null;
   }
 
+  static List<MedicationProduct> search(String query, {int limit = 12}) {
+    final words = _normalize(query).split(' ').where((word) => word.isNotEmpty).toList();
+    if (words.isEmpty) return const [];
+
+    final matches = <({MedicationProduct product, int score})>[];
+    for (final product in products) {
+      if (!product.active) continue;
+      final generic = _normalize(product.genericName);
+      final brand = _normalize(product.brandName);
+      final strength = _normalize(product.strength);
+      final manufacturer = _normalize(product.manufacturer);
+      final category = _normalize(product.therapeuticCategory ?? '');
+      final ingredients = _normalize(product.ingredients.join(' '));
+      final haystack = '$generic $brand $strength $manufacturer $category $ingredients';
+      if (!words.every(haystack.contains)) continue;
+
+      var score = 10;
+      final normalizedQuery = _normalize(query);
+      if (generic == normalizedQuery || brand == normalizedQuery) score += 100;
+      if (generic.startsWith(normalizedQuery) || brand.startsWith(normalizedQuery)) score += 40;
+      if (generic.contains(normalizedQuery) || brand.contains(normalizedQuery)) score += 25;
+      if (strength.contains(normalizedQuery)) score += 5;
+      matches.add((product: product, score: score));
+    }
+
+    matches.sort((a, b) {
+      final score = b.score.compareTo(a.score);
+      if (score != 0) return score;
+      return a.product.displayName.compareTo(b.product.displayName);
+    });
+    return matches.take(limit).map((entry) => entry.product).toList(growable: false);
+  }
+
   static MedicationProduct? byId(String id) {
     for (final product in products) {
       if (product.id == id) return product;
     }
     return null;
   }
+
+  static String _normalize(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
