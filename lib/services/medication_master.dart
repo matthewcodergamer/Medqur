@@ -1,5 +1,12 @@
 import 'medication_identifier.dart';
 
+enum MedicationProductSource {
+  jamaicaApproved,
+  publicReference,
+  observedPackage,
+  prototype,
+}
+
 class MedicationProduct {
   const MedicationProduct({
     required this.id,
@@ -8,10 +15,15 @@ class MedicationProduct {
     required this.strength,
     required this.dosageForm,
     required this.manufacturer,
+    required this.source,
     this.packageDescription,
-    this.gtin,
-    this.prototypeAliases = const [],
+    this.gtins = const [],
+    this.rawAliases = const [],
+    this.rxcui,
+    this.ndc,
+    this.jamaicaReference,
     this.active = true,
+    this.clinicallyVerified = false,
   });
 
   final String id;
@@ -20,25 +32,80 @@ class MedicationProduct {
   final String strength;
   final String dosageForm;
   final String manufacturer;
+  final MedicationProductSource source;
   final String? packageDescription;
-  final String? gtin;
-  final List<String> prototypeAliases;
+  final List<String> gtins;
+  final List<String> rawAliases;
+  final String? rxcui;
+  final String? ndc;
+  final String? jamaicaReference;
   final bool active;
+  final bool clinicallyVerified;
+
+  String? get gtin => gtins.isEmpty ? null : gtins.first;
 
   String get displayName {
     final brand = brandName.trim().isEmpty ? '' : ' ($brandName)';
-    return '$genericName $strength$brand';
+    final dose = strength.trim().isEmpty ? '' : ' $strength';
+    return '$genericName$dose$brand';
   }
+
+  String get sourceLabel => switch (source) {
+        MedicationProductSource.jamaicaApproved => 'Jamaica approved medication master',
+        MedicationProductSource.publicReference => 'Public medication reference',
+        MedicationProductSource.observedPackage => 'Observed package fixture',
+        MedicationProductSource.prototype => 'Medqur prototype fixture',
+      };
 }
 
-/// Prototype lookup boundary for a future Jamaica medication master.
+/// Small local cache/fixture catalogue.
 ///
-/// Production data should come from an approved Ministry/pharmacy/procurement
-/// source. We intentionally do not ship invented real-world GTIN mappings.
+/// This is NOT the national medication database. Production resolution is
+/// performed by MedicationRegistryClient, which can query an approved Medqur
+/// medication-registry backend and public reference services. The observed
+/// package entries below are grounded in packages supplied during prototype
+/// testing and are deliberately marked as not clinically verified.
 class MedicationMasterCatalog {
   const MedicationMasterCatalog._();
 
   static const products = <MedicationProduct>[
+    MedicationProduct(
+      id: 'OBS-NEUROBALIN-75',
+      genericName: 'Pregabalin',
+      brandName: 'Neurobalin-75',
+      strength: '75 mg',
+      dosageForm: 'Capsule',
+      manufacturer: 'Indus Life Sciences Pvt. Ltd.',
+      source: MedicationProductSource.observedPackage,
+      packageDescription: 'Prescription package observed in Medqur prototype testing',
+      gtins: ['18904215101509'],
+      jamaicaReference: 'National Health Fund benefits listing includes NEUROBALIN-75 CAP 75mg',
+    ),
+    MedicationProduct(
+      id: 'OBS-CEFUR-500',
+      genericName: 'Cefuroxime axetil',
+      brandName: 'CEFUR',
+      strength: '500 mg',
+      dosageForm: 'Tablet',
+      manufacturer: 'Ryvis Pharma',
+      source: MedicationProductSource.observedPackage,
+      packageDescription: '10-tablet prescription package observed in Medqur prototype testing',
+      // The package carries a GS1 DataMatrix GTIN and a separate EAN-13.
+      gtins: ['18906102700512', '08906102700515'],
+      rawAliases: ['8906102700515'],
+    ),
+    MedicationProduct(
+      id: 'OBS-MUCINEX-DM-MAX',
+      genericName: 'Guaifenesin / Dextromethorphan HBr',
+      brandName: 'Mucinex DM Maximum Strength',
+      strength: '1200 mg / 60 mg',
+      dosageForm: 'Extended-release tablet',
+      manufacturer: 'Package manufacturer to be verified by external registry',
+      source: MedicationProductSource.observedPackage,
+      packageDescription: 'Maximum-strength 12-hour expectorant / cough suppressant package',
+      gtins: ['00363824050287'],
+      rawAliases: ['363824050287'],
+    ),
     MedicationProduct(
       id: 'DEMO-PARA-500-TAB',
       genericName: 'Paracetamol',
@@ -46,8 +113,9 @@ class MedicationMasterCatalog {
       strength: '500 mg',
       dosageForm: 'Tablet',
       manufacturer: 'Prototype only',
+      source: MedicationProductSource.prototype,
       packageDescription: 'Prototype unit-dose medication',
-      prototypeAliases: ['MEDQUR-DEMO-PARA-500'],
+      rawAliases: ['MEDQUR-DEMO-PARA-500'],
     ),
     MedicationProduct(
       id: 'DEMO-AMOX-500-CAP',
@@ -56,16 +124,22 @@ class MedicationMasterCatalog {
       strength: '500 mg',
       dosageForm: 'Capsule',
       manufacturer: 'Prototype only',
+      source: MedicationProductSource.prototype,
       packageDescription: 'Prototype unit-dose medication',
-      prototypeAliases: ['MEDQUR-DEMO-AMOX-500'],
+      rawAliases: ['MEDQUR-DEMO-AMOX-500'],
     ),
   ];
 
   static MedicationProduct? lookup(MedicationIdentifier identifier) {
     final gtin = identifier.gtin;
+    final normalizedRaw = identifier.rawValue.trim();
     for (final product in products) {
-      if (gtin != null && product.gtin == gtin) return product;
-      if (product.prototypeAliases.contains(identifier.rawValue)) return product;
+      if (gtin != null && product.gtins.contains(gtin)) return product;
+      if (product.rawAliases.contains(normalizedRaw)) return product;
+      if (RegExp(r'^\d+$').hasMatch(normalizedRaw)) {
+        final padded = normalizedRaw.padLeft(14, '0');
+        if (product.gtins.contains(padded)) return product;
+      }
     }
     return null;
   }
