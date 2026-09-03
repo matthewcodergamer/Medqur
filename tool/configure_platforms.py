@@ -59,6 +59,7 @@ def configure_android() -> None:
     permissions = [
         '<uses-permission android:name="android.permission.CAMERA" />',
         '<uses-permission android:name="android.permission.USE_BIOMETRIC" />',
+        '<uses-permission android:name="android.permission.INTERNET" />',
     ]
     insertion = "\n    " + "\n    ".join(p for p in permissions if p not in manifest) + "\n"
     if insertion.strip():
@@ -170,7 +171,7 @@ def main() -> None:
     configure_android()
     configure_ios()
     configure_web()
-    print("Configured Medqur platform permissions, native auth, printing, and icons.")
+    print("Configured Medqur platform permissions, native auth, printing, network access, and icons.")
 
 
 if __name__ == "__main__":
