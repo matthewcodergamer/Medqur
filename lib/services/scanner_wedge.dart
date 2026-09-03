@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Collects characters from USB/Bluetooth/Zebra/Honeywell scanners configured
@@ -33,7 +34,9 @@ class ScannerWedgeCollector {
     }
 
     final character = event.character;
-    if (character != null && character.length == 1 && character.codeUnitAt(0) >= 32) {
+    if (character != null &&
+        character.length == 1 &&
+        character.codeUnitAt(0) >= 32) {
       _buffer.write(character);
       return KeyEventResult.handled;
     }
