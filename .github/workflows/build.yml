@@ -50,6 +50,9 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
+      - name: Test functional core
+        run: flutter test
+
       - name: Build release APK
         run: flutter build apk --release
 
