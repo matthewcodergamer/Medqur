@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../widgets/common.dart';
-import '../widgets/medqur_design.dart';
 import 'home_dashboard_page.dart';
 import 'new_encounter_page_v2.dart';
 import 'orders_tasks_page.dart';
 import 'patient_detail_page_v2.dart';
 import 'patient_queue_page.dart';
 import 'pharmacy_page.dart';
+import 'prescription_composer_page.dart';
 import 'profile_page_v2.dart';
 import 'scan_page_v2.dart';
 
@@ -36,7 +36,6 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
   int index = 0;
 
   bool get isDoctor => widget.staff.role == StaffRole.doctor;
-  bool get isNurse => widget.staff.role == StaffRole.nurse;
   bool get isPharmacist => widget.staff.role == StaffRole.pharmacist;
 
   List<_NavItem> get items => const [
@@ -52,14 +51,13 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
     widget.onPatientsChanged();
   }
 
-  void openPatient(Patient patient, {bool openOrderComposer = false}) {
+  void openPatient(Patient patient) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PatientDetailPageV2(
           staff: widget.staff,
           patient: patient,
           onChanged: _patientChanged,
-          openOrderComposer: openOrderComposer,
         ),
       ),
     );
@@ -89,6 +87,7 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
       );
       return;
     }
+
     final patient = await showModalBottomSheet<Patient>(
       context: context,
       showDragHandle: true,
@@ -107,7 +106,7 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
                 ),
                 const SizedBox(height: 5),
                 const Text(
-                  'Choose the patient encounter. The patient context remains visible while you prescribe and sign.',
+                  'Choose the patient encounter. Patient identity and allergies stay visible while you prescribe.',
                   style: TextStyle(color: Color(0xFF718095), fontSize: 12.5, height: 1.35),
                 ),
                 const SizedBox(height: 14),
@@ -141,7 +140,33 @@ class _ClinicalShellV2State extends State<ClinicalShellV2> {
         ),
       ),
     );
-    if (patient != null && mounted) openPatient(patient, openOrderComposer: true);
+    if (patient == null || !mounted) return;
+
+    final order = await Navigator.of(context).push<MedicationOrder>(
+      MaterialPageRoute(
+        builder: (_) => PrescriptionComposerPage(
+          staff: widget.staff,
+          patient: patient,
+          facility: widget.facility,
+        ),
+      ),
+    );
+    if (order == null || !mounted) return;
+
+    patient.medications.add(order);
+    patient.status = PatientStatus.treatment;
+    patient.timeline.add(
+      '${TimeOfDay.now().format(context)} — ${order.name} ${order.dose} prescription sent by ${widget.staff.name}',
+    );
+    await widget.onPatientsChanged();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Prescription signed and added to the patient medication workflow.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Widget page() => switch (index) {
