@@ -1,6 +1,6 @@
 {
   "name": "medqur-pharmacy-backend",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "identity:dev": "tsx watch src/identity_server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "identity:start": "node dist/identity_server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
