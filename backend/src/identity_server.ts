@@ -108,14 +108,16 @@ function signedToken(payload: StaffBadgePayload): string {
 function verifySignedToken(token: string): StaffBadgePayload | null {
   const parts = token.trim().split('.');
   if (parts.length !== 3 || parts[0] !== 'MQW1') return null;
-  const payload = decodePayload(parts[1]);
+  const encodedPayload = parts[1]!;
+  const encodedSignature = parts[2]!;
+  const payload = decodePayload(encodedPayload);
   if (!payload || payload.kid !== config.staffBadgeKeyId) return null;
   try {
     const valid = cryptoVerify(
       null,
-      Buffer.from(parts[1], 'utf8'),
+      Buffer.from(encodedPayload, 'utf8'),
       publicKey(),
-      Buffer.from(parts[2], 'base64url'),
+      Buffer.from(encodedSignature, 'base64url'),
     );
     return valid ? payload : null;
   } catch {
