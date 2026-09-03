@@ -28,8 +28,10 @@ const facilities = <Facility>[
   ),
 ];
 
+// Every health worker uses one stable six-digit Medqur staff number regardless
+// of profession, parish or facility. These are prototype identities only.
 const demoDoctor = StaffProfile(
-  id: 'MQ-7K4P-92XF',
+  id: '482731',
   name: 'Dr. Maya Brown',
   role: StaffRole.doctor,
   title: 'Medical Officer',
@@ -38,7 +40,7 @@ const demoDoctor = StaffProfile(
 );
 
 const demoNurse = StaffProfile(
-  id: 'MQ-2N8R-41KD',
+  id: '615204',
   name: 'Nurse Aaliyah Grant',
   role: StaffRole.nurse,
   title: 'Registered Nurse',
@@ -47,7 +49,7 @@ const demoNurse = StaffProfile(
 );
 
 const demoPharmacist = StaffProfile(
-  id: 'MQ-5PHR-90RX',
+  id: '739182',
   name: 'Pharmacist Jordan Reid',
   role: StaffRole.pharmacist,
   title: 'Hospital Pharmacist',
