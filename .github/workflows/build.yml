@@ -13,6 +13,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend:
+    name: Pharmacy backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Typecheck backend
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Start PostgreSQL and apply medication schema
+        working-directory: backend
+        run: |
+          docker compose up -d postgres
+          for i in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U medqur -d medqur; then
+              break
+            fi
+            sleep 2
+          done
+          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT count(*) AS medication_tables FROM information_schema.tables WHERE table_schema='public';"
+          docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT facility_id, code, name FROM inventory_locations;"
+
   android-and-web:
     name: Android + Web
     runs-on: ubuntu-latest
@@ -130,7 +165,7 @@ jobs:
 
   release-downloads:
     name: Publish easy downloads
-    needs: [android-and-web, ios]
+    needs: [backend, android-and-web, ios]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -159,7 +194,7 @@ jobs:
           - **Medqur-Android.apk** — Android release APK.
           - **Medqur-iOS-Unsigned.zip** — unsigned iOS `Runner.app` package. It is not an App Store/TestFlight-signed IPA and cannot be installed normally on an iPhone until it is code-signed.
 
-          This is a prototype build and does not connect to production NIDS, Ministry of Health, or e-Care services.
+          V0.9 includes the medication-master/pharmacy platform foundation. Production clinical use still requires approved medication/formulary data, OIDC infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
           EOF
 
       - name: Replace latest GitHub Release
