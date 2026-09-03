@@ -1,4 +1,4 @@
-enum StaffRole { doctor, nurse }
+enum StaffRole { doctor, nurse, pharmacist }
 
 enum TriageLevel { critical, urgent, moderate, routine }
 
@@ -187,6 +187,14 @@ class MedicationOrder {
     required this.orderedBy,
     this.administered = false,
     this.productCode,
+    this.orderId,
+    this.productId,
+    this.dispenseId,
+    this.lotId,
+    this.scheduledAt,
+    this.earlyGraceMinutes = 30,
+    this.lateGraceMinutes = 60,
+    this.productVerified = false,
   });
 
   final String name;
@@ -196,10 +204,38 @@ class MedicationOrder {
   final String orderedBy;
   final bool administered;
   final String? productCode;
+  final String? orderId;
+  final String? productId;
+  final String? dispenseId;
+  final String? lotId;
+  final DateTime? scheduledAt;
+  final int earlyGraceMinutes;
+  final int lateGraceMinutes;
+  final bool productVerified;
+
+  bool isTooEarly([DateTime? at]) {
+    if (scheduledAt == null) return false;
+    final now = at ?? DateTime.now();
+    return now.isBefore(scheduledAt!.subtract(Duration(minutes: earlyGraceMinutes)));
+  }
+
+  bool isLate([DateTime? at]) {
+    if (scheduledAt == null) return false;
+    final now = at ?? DateTime.now();
+    return now.isAfter(scheduledAt!.add(Duration(minutes: lateGraceMinutes)));
+  }
 
   MedicationOrder copyWith({
     bool? administered,
     String? productCode,
+    String? orderId,
+    String? productId,
+    String? dispenseId,
+    String? lotId,
+    DateTime? scheduledAt,
+    int? earlyGraceMinutes,
+    int? lateGraceMinutes,
+    bool? productVerified,
   }) =>
       MedicationOrder(
         name: name,
@@ -209,6 +245,14 @@ class MedicationOrder {
         orderedBy: orderedBy,
         administered: administered ?? this.administered,
         productCode: productCode ?? this.productCode,
+        orderId: orderId ?? this.orderId,
+        productId: productId ?? this.productId,
+        dispenseId: dispenseId ?? this.dispenseId,
+        lotId: lotId ?? this.lotId,
+        scheduledAt: scheduledAt ?? this.scheduledAt,
+        earlyGraceMinutes: earlyGraceMinutes ?? this.earlyGraceMinutes,
+        lateGraceMinutes: lateGraceMinutes ?? this.lateGraceMinutes,
+        productVerified: productVerified ?? this.productVerified,
       );
 
   Map<String, dynamic> toJson() => {
@@ -219,6 +263,14 @@ class MedicationOrder {
         'orderedBy': orderedBy,
         'administered': administered,
         'productCode': productCode,
+        'orderId': orderId,
+        'productId': productId,
+        'dispenseId': dispenseId,
+        'lotId': lotId,
+        'scheduledAt': scheduledAt?.toIso8601String(),
+        'earlyGraceMinutes': earlyGraceMinutes,
+        'lateGraceMinutes': lateGraceMinutes,
+        'productVerified': productVerified,
       };
 
   factory MedicationOrder.fromJson(Map<String, dynamic> json) =>
@@ -230,6 +282,14 @@ class MedicationOrder {
         orderedBy: json['orderedBy']?.toString() ?? '',
         administered: json['administered'] == true,
         productCode: json['productCode']?.toString(),
+        orderId: json['orderId']?.toString(),
+        productId: json['productId']?.toString(),
+        dispenseId: json['dispenseId']?.toString(),
+        lotId: json['lotId']?.toString(),
+        scheduledAt: DateTime.tryParse(json['scheduledAt']?.toString() ?? ''),
+        earlyGraceMinutes: (json['earlyGraceMinutes'] as num?)?.toInt() ?? 30,
+        lateGraceMinutes: (json['lateGraceMinutes'] as num?)?.toInt() ?? 60,
+        productVerified: json['productVerified'] == true,
       );
 }
 
