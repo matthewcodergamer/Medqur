@@ -24,9 +24,26 @@ class MedicationSafetyEngine {
   }) {
     final blockers = <String>[];
     final warnings = <String>[];
+    final at = now ?? DateTime.now();
 
     if (order.administered) {
       blockers.add('This medication order is already recorded as administered.');
+    }
+
+    if (order.isTooEarly(at)) {
+      blockers.add(
+        'Medication is earlier than the configured administration window. Recheck the scheduled time or obtain an authorized override.',
+      );
+    } else if (order.isLate(at)) {
+      warnings.add(
+        'Medication is later than the configured administration window. Follow the facility late-dose/omission policy before recording it.',
+      );
+    }
+
+    if (!order.productVerified) {
+      warnings.add(
+        'The order is not marked as verified by the approved medication master/pharmacy workflow. Prototype matching is not a substitute for pharmacist verification.',
+      );
     }
 
     if (scan.gtin != null && scan.gtinCheckDigitValid == false) {
@@ -56,7 +73,7 @@ class MedicationSafetyEngine {
       }
     }
 
-    if (scan.isExpired(now)) {
+    if (scan.isExpired(at)) {
       blockers.add('Medication is expired according to the scanned GS1 expiry date.');
     }
 
@@ -72,6 +89,9 @@ class MedicationSafetyEngine {
       warnings.add('Product identified, but no machine-readable expiry date was available.');
     }
 
+    // Prototype-only local fallback. Production should call the backend
+    // structured allergy/interaction endpoint, which uses coded ingredients and
+    // an approved, versioned clinical knowledge source.
     final medicationName = _normalize(order.name);
     for (final allergy in patient.allergies) {
       final normalized = _normalize(allergy);
