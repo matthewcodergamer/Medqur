@@ -62,24 +62,48 @@ class MedicationNameMatch {
 /// Multi-source medication identity resolver.
 ///
 /// Resolution order:
-/// 1. an optional Medqur/Jamaica approved registry backend, configured with
-///    --dart-define=MEDQUR_MEDICATION_API_BASE=https://.../ ;
-/// 2. the small local observed/prototype cache;
-/// 3. openFDA NDC Directory UPC lookup for US-market packages;
+/// 1. Medqur/Jamaica approved registry backend when configured;
+/// 2. local observed/prototype cache;
+/// 3. openFDA NDC Directory UPC lookup for compatible US-market packages;
 /// 4. unresolved, requiring pharmacist/master-data verification.
 ///
-/// RxNorm is also available as a name-search fallback. Public FDA/RxNorm data is
-/// reference data only and is never elevated to Jamaica-approved clinical data.
+/// Public FDA/RxNorm data is reference data only and is never elevated to
+/// Jamaica-approved clinical data.
 class MedicationRegistryClient {
-  MedicationRegistryClient({http.Client? client}) : _client = client ?? http.Client();
+  MedicationRegistryClient({
+    http.Client? client,
+    Future<String?> Function()? accessTokenProvider,
+  })  : _client = client ?? http.Client(),
+        _accessTokenProvider = accessTokenProvider;
 
-  static const String _configuredBase =
+  static const String _medicationBase =
       String.fromEnvironment('MEDQUR_MEDICATION_API_BASE', defaultValue: '');
+  static const String _apiBase =
+      String.fromEnvironment('MEDQUR_API_BASE', defaultValue: '');
+  static const bool _devBackendAuth =
+      bool.fromEnvironment('MEDQUR_DEV_BACKEND_AUTH', defaultValue: false);
+
+  static String get configuredBase =>
+      _medicationBase.trim().isNotEmpty ? _medicationBase : _apiBase;
 
   final http.Client _client;
+  final Future<String?> Function()? _accessTokenProvider;
   final Map<String, MedicationResolution> _cache = {};
 
   void dispose() => _client.close();
+
+  Future<Map<String, String>> _backendHeaders() async {
+    final headers = <String, String>{'Accept': 'application/json'};
+    final token = await _accessTokenProvider?.call();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    } else if (_devBackendAuth) {
+      headers['x-medqur-staff-id'] = 'DEV-PHARMACIST';
+      headers['x-medqur-role'] = 'pharmacist';
+      headers['x-medqur-facility'] = 'MRH';
+    }
+    return headers;
+  }
 
   Future<MedicationResolution> resolve(
     MedicationIdentifier identifier, {
@@ -94,7 +118,8 @@ class MedicationRegistryClient {
         identifier: identifier,
         trust: MedicationResolutionTrust.unresolved,
         source: 'GS1 validation',
-        message: 'The scanned GTIN has an invalid check digit. Re-scan the package before using it.',
+        message:
+            'The scanned GTIN has an invalid check digit. Re-scan the package before using it.',
       );
       _cache[cacheKey] = result;
       return result;
@@ -109,9 +134,12 @@ class MedicationRegistryClient {
     final local = MedicationMasterCatalog.lookup(identifier);
     if (local != null) {
       final trust = switch (local.source) {
-        MedicationProductSource.jamaicaApproved => MedicationResolutionTrust.jamaicaApproved,
-        MedicationProductSource.publicReference => MedicationResolutionTrust.publicReference,
-        MedicationProductSource.observedPackage => MedicationResolutionTrust.observedPackage,
+        MedicationProductSource.jamaicaApproved =>
+          MedicationResolutionTrust.jamaicaApproved,
+        MedicationProductSource.publicReference =>
+          MedicationResolutionTrust.publicReference,
+        MedicationProductSource.observedPackage =>
+          MedicationResolutionTrust.observedPackage,
         MedicationProductSource.prototype => MedicationResolutionTrust.prototype,
       };
       final result = MedicationResolution(
@@ -155,17 +183,15 @@ class MedicationRegistryClient {
       final uri = Uri.https(
         'rxnav.nlm.nih.gov',
         '/REST/approximateTerm.json',
-        {
-          'term': value,
-          'maxEntries': '8',
-          'option': '1',
-        },
+        {'term': value, 'maxEntries': '8', 'option': '1'},
       );
-      final response = await _client.get(uri).timeout(const Duration(seconds: 7));
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 7));
       if (response.statusCode != 200) return const [];
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final group = body['approximateGroup'] as Map<String, dynamic>?;
-      final candidates = (group?['candidate'] as List<dynamic>? ?? const []);
+      final candidates =
+          (group?['candidate'] as List<dynamic>? ?? const []);
       final matches = <MedicationNameMatch>[];
       for (final raw in candidates) {
         if (raw is! Map<String, dynamic>) continue;
@@ -188,11 +214,10 @@ class MedicationRegistryClient {
   Future<MedicationResolution?> _resolveApprovedRegistry(
     MedicationIdentifier identifier,
   ) async {
-    if (_configuredBase.trim().isEmpty) return null;
+    final configured = configuredBase.trim();
+    if (configured.isEmpty) return null;
     try {
-      final base = Uri.parse(
-        _configuredBase.endsWith('/') ? _configuredBase : '$_configuredBase/',
-      );
+      final base = Uri.parse(configured.endsWith('/') ? configured : '$configured/');
       final uri = base.resolve('v1/medications/resolve').replace(
         queryParameters: {
           if (identifier.gtin != null) 'gtin': identifier.gtin!,
@@ -200,7 +225,7 @@ class MedicationRegistryClient {
         },
       );
       final response = await _client
-          .get(uri, headers: const {'Accept': 'application/json'})
+          .get(uri, headers: await _backendHeaders())
           .timeout(const Duration(seconds: 6));
       if (response.statusCode == 404) return null;
       if (response.statusCode != 200) return null;
@@ -209,8 +234,12 @@ class MedicationRegistryClient {
       final productJson = decoded['product'] is Map<String, dynamic>
           ? decoded['product'] as Map<String, dynamic>
           : decoded;
-      final verified = decoded['verified'] == true || productJson['verified'] == true;
-      final product = _productFromRegistry(productJson, clinicallyVerified: verified);
+      final verified =
+          decoded['verified'] == true || productJson['verified'] == true;
+      final product = _productFromRegistry(
+        productJson,
+        clinicallyVerified: verified,
+      );
       if (product == null) return null;
       return MedicationResolution(
         identifier: identifier,
@@ -218,10 +247,12 @@ class MedicationRegistryClient {
         trust: verified
             ? MedicationResolutionTrust.jamaicaApproved
             : MedicationResolutionTrust.publicReference,
-        source: decoded['source']?.toString() ?? 'Configured Medqur medication registry',
-        message: verified
-            ? 'Product identity verified by the configured approved medication registry.'
-            : 'Registry returned a product reference, but it is not marked clinically verified.',
+        source: decoded['source']?.toString() ??
+            'Configured Medqur medication registry',
+        message: decoded['message']?.toString() ??
+            (verified
+                ? 'Product identity verified by the configured approved medication registry.'
+                : 'Registry returned a product reference, but it is not marked clinically verified.'),
         onlineLookup: true,
       );
     } on Object {
@@ -238,12 +269,10 @@ class MedicationRegistryClient {
         final uri = Uri.https(
           'api.fda.gov',
           '/drug/ndc.json',
-          {
-            'search': 'openfda.upc:"$upc"',
-            'limit': '5',
-          },
+          {'search': 'openfda.upc:"$upc"', 'limit': '5'},
         );
-        final response = await _client.get(uri).timeout(const Duration(seconds: 6));
+        final response =
+            await _client.get(uri).timeout(const Duration(seconds: 6));
         if (response.statusCode == 404) continue;
         if (response.statusCode != 200) continue;
         final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -257,11 +286,12 @@ class MedicationRegistryClient {
           product: product,
           trust: MedicationResolutionTrust.publicReference,
           source: 'openFDA NDC Directory',
-          message: 'UPC matched the public FDA NDC Directory. This is reference data, not Jamaica formulary approval or a substitute for pharmacist verification.',
+          message:
+              'UPC matched the public FDA NDC Directory. This is reference data, not Jamaica formulary approval or a substitute for pharmacist verification.',
           onlineLookup: true,
         );
       } on Object {
-        // Try the next candidate or fall through to unresolved.
+        // Try next candidate.
       }
     }
     return null;
@@ -286,8 +316,12 @@ class MedicationRegistryClient {
     Map<String, dynamic> json, {
     required bool clinicallyVerified,
   }) {
-    final generic = json['genericName']?.toString() ?? json['generic_name']?.toString() ?? '';
-    final brand = json['brandName']?.toString() ?? json['brand_name']?.toString() ?? '';
+    final generic = json['genericName']?.toString() ??
+        json['generic_name']?.toString() ??
+        '';
+    final brand = json['brandName']?.toString() ??
+        json['brand_name']?.toString() ??
+        '';
     if (generic.isEmpty && brand.isEmpty) return null;
     final gtins = <String>[];
     final rawGtins = json['gtins'];
@@ -298,13 +332,18 @@ class MedicationRegistryClient {
       }
     }
     final single = json['gtin']?.toString();
-    if (single != null && single.isNotEmpty && !gtins.contains(single)) gtins.add(single);
+    if (single != null && single.isNotEmpty && !gtins.contains(single)) {
+      gtins.add(single);
+    }
     return MedicationProduct(
-      id: json['id']?.toString() ?? 'REGISTRY-${gtins.isEmpty ? brand : gtins.first}',
+      id: json['id']?.toString() ??
+          'REGISTRY-${gtins.isEmpty ? brand : gtins.first}',
       genericName: generic,
       brandName: brand,
       strength: json['strength']?.toString() ?? '',
-      dosageForm: json['dosageForm']?.toString() ?? json['dosage_form']?.toString() ?? '',
+      dosageForm: json['dosageForm']?.toString() ??
+          json['dosage_form']?.toString() ??
+          '',
       manufacturer: json['manufacturer']?.toString() ?? '',
       source: clinicallyVerified
           ? MedicationProductSource.jamaicaApproved
@@ -314,7 +353,8 @@ class MedicationRegistryClient {
       rxcui: json['rxcui']?.toString(),
       ndc: json['ndc']?.toString(),
       clinicallyVerified: clinicallyVerified,
-      jamaicaReference: json['jamaicaReference']?.toString(),
+      jamaicaReference: json['jamaicaReference']?.toString() ??
+          json['provenanceReference']?.toString(),
     );
   }
 
@@ -333,7 +373,9 @@ class MedicationRegistryClient {
       if (strength != null && strength.isNotEmpty) strengths.add(strength);
     }
     final generic = json['generic_name']?.toString();
-    final brand = json['brand_name']?.toString() ?? json['brand_name_base']?.toString() ?? '';
+    final brand = json['brand_name']?.toString() ??
+        json['brand_name_base']?.toString() ??
+        '';
     final packageNdc = json['package_ndc']?.toString();
     return MedicationProduct(
       id: 'OPENFDA-${packageNdc ?? scannedGtin ?? brand}',
@@ -347,7 +389,8 @@ class MedicationRegistryClient {
       dosageForm: json['dosage_form']?.toString() ?? '',
       manufacturer: json['labeler_name']?.toString() ?? '',
       source: MedicationProductSource.publicReference,
-      packageDescription: packageNdc == null ? null : 'NDC package $packageNdc',
+      packageDescription:
+          packageNdc == null ? null : 'NDC package $packageNdc',
       gtins: scannedGtin == null ? const [] : [scannedGtin],
       ndc: json['product_ndc']?.toString() ?? packageNdc,
       clinicallyVerified: false,
