@@ -2,12 +2,12 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:medqur/generated/prescription_template_data.dart';
+import 'package:medqur/services/prescription_template_image.dart';
 import 'package:medqur/services/signature_vault.dart';
 
 void main() {
   test('MRH prescription template normalizes to a renderable RGBA PNG', () {
-    final bytes = prescriptionTemplatePngBytes();
+    final bytes = PrescriptionTemplateImage.bytes();
     expect(bytes, isNotEmpty);
 
     final decoded = img.decodePng(bytes);
@@ -35,7 +35,6 @@ void main() {
 
     for (var y = 0; y < source.height; y++) {
       for (var x = 0; x < source.width; x++) {
-        // Simulate real paper with gentle uneven lighting and a broad shadow.
         final shade = 250 -
             ((x / source.width) * 16).round() -
             ((y / source.height) * 7).round();
@@ -43,7 +42,6 @@ void main() {
       }
     }
 
-    // Add a broad low-contrast camera shadow that must NOT become signature ink.
     for (var y = 260; y < 340; y++) {
       for (var x = 0; x < 760; x++) {
         final p = source.getPixel(x, y);
@@ -52,7 +50,6 @@ void main() {
       }
     }
 
-    // Draw a blue signature-like set of continuous strokes.
     final blue = img.ColorRgb8(22, 70, 166);
     img.drawLine(
       source,
