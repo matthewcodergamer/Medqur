@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/staff_identity.dart';
 import '../widgets/common.dart';
+import '../widgets/medqur_design.dart';
+import 'signature_vault_page.dart';
 
 class ProfilePageV2 extends StatefulWidget {
   const ProfilePageV2({
@@ -24,53 +26,11 @@ class _ProfilePageV2State extends State<ProfilePageV2> {
   final _identity = StaffIdentityClient();
   StaffBadgePresentation? _signedBadge;
   bool _loadingBadge = false;
-  String? _badgeStatus;
 
   @override
   void initState() {
     super.initState();
     _loadSignedBadge();
-  }
-
-  Future<void> _loadSignedBadge() async {
-    if (!_identity.isConfigured) {
-      setState(() {
-        _signedBadge = null;
-        _badgeStatus = 'Identity service not configured in this build.';
-      });
-      return;
-    }
-    setState(() {
-      _loadingBadge = true;
-      _badgeStatus = 'Loading signed credential…';
-    });
-    try {
-      final value = await _identity.fetchMyBadge(
-        staff: widget.staff,
-        facility: widget.facility,
-      );
-      if (!mounted) return;
-      setState(() {
-        _signedBadge = value;
-        _badgeStatus = value == null
-            ? 'No active signed credential was returned. An authorized identity administrator must issue the badge.'
-            : 'Signed credential loaded and ready to scan.';
-      });
-    } on Object catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _signedBadge = null;
-        _badgeStatus = 'Unable to load signed staff credential: $error';
-      });
-    } finally {
-      if (mounted) setState(() => _loadingBadge = false);
-    }
-  }
-
-  String get _qrData {
-    final signed = _signedBadge;
-    if (signed != null) return signed.token;
-    return StaffBadgeCodec.prototypeToken(widget.staff.id);
   }
 
   @override
@@ -79,281 +39,280 @@ class _ProfilePageV2State extends State<ProfilePageV2> {
     super.dispose();
   }
 
+  Future<void> _loadSignedBadge() async {
+    if (!_identity.isConfigured) return;
+    setState(() => _loadingBadge = true);
+    try {
+      final value = await _identity.fetchMyBadge(
+        staff: widget.staff,
+        facility: widget.facility,
+      );
+      if (!mounted) return;
+      setState(() => _signedBadge = value);
+    } on Object {
+      if (!mounted) return;
+      setState(() => _signedBadge = null);
+    } finally {
+      if (mounted) setState(() => _loadingBadge = false);
+    }
+  }
+
+  String get _qrData =>
+      _signedBadge?.token ?? StaffBadgeCodec.prototypeToken(widget.staff.id);
+
   @override
   Widget build(BuildContext context) {
     final staff = widget.staff;
     final facility = widget.facility;
     final signed = _signedBadge != null;
 
-    return ListView(
-      padding: const EdgeInsets.all(22),
+    return MedqurPage(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text('Health worker ID', style: Theme.of(context).textTheme.headlineSmall),
-            ),
-            if (_loadingBadge)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.3),
-              ),
-          ],
+        MedqurPageHeader(
+          eyebrow: 'Account',
+          title: staff.name,
+          subtitle: '${staff.title} • ${facility.name}',
+          trailing: _loadingBadge
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
         ),
         const SizedBox(height: 18),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 590),
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [medqurNavy, medqurBlue]),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x26173F8A),
-                    blurRadius: 30,
-                    offset: Offset(0, 14),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const MedqurLogo(width: 112),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .14),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: Colors.white.withValues(alpha: .18)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              signed ? Icons.verified_user_rounded : Icons.science_outlined,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              signed ? 'SIGNED ID' : 'PROTOTYPE ID',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: .7,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 31,
-                        backgroundColor: Colors.white.withValues(alpha: .16),
-                        foregroundColor: Colors.white,
-                        child: Text(
-                          staff.name.split(' ').last[0],
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              staff.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 21,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              staff.title,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: .78),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  Container(height: 1, color: Colors.white.withValues(alpha: .18)),
-                  const SizedBox(height: 18),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _label('6-DIGIT STAFF ID', staff.id, prominent: true),
-                            const SizedBox(height: 12),
-                            _label('REGISTRATION', staff.registration.isEmpty ? 'Not recorded' : staff.registration),
-                            const SizedBox(height: 12),
-                            _label('ACTIVE SITE', facility.name),
-                            const SizedBox(height: 12),
-                            _label('FACILITY TIER', facility.classificationLabel),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(7),
-                          child: FakeQr(size: 104, data: _qrData),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_signedBadge?.expiresAt != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'QR credential expires ${_date(_signedBadge!.expiresAt!)} • ${_signedBadge!.signingKeyId}',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .66),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
+        _StaffCredentialCard(
+          staff: staff,
+          facility: facility,
+          signed: signed,
+          qrData: _qrData,
+          expiresAt: _signedBadge?.expiresAt,
         ),
-        const SizedBox(height: 12),
-        if (_badgeStatus != null)
-          Text(
-            _badgeStatus!,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF748297), fontSize: 11.5),
-          ),
-        if (_identity.isConfigured) ...[
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              onPressed: _loadingBadge ? null : _loadSignedBadge,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Refresh staff credential'),
+        const SizedBox(height: 18),
+        const _ProfileSectionLabel('Work'),
+        const SizedBox(height: 8),
+        _SettingsCard(
+          children: [
+            _SettingsRow(
+              icon: Icons.apartment_outlined,
+              title: facility.name,
+              subtitle: facility.classificationLabel,
             ),
+            const Divider(),
+            _SettingsRow(
+              icon: Icons.badge_outlined,
+              title: 'Professional registration',
+              subtitle: staff.registration.trim().isEmpty
+                  ? 'Not recorded'
+                  : staff.registration,
+            ),
+          ],
+        ),
+        if (staff.role == StaffRole.doctor) ...[
+          const SizedBox(height: 18),
+          const _ProfileSectionLabel('Prescribing'),
+          const SizedBox(height: 8),
+          _SettingsCard(
+            children: [
+              _SettingsRow(
+                icon: Icons.draw_outlined,
+                title: 'Signatures',
+                subtitle:
+                    'Manage your default and alternate prescription signatures',
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SignatureVaultPage(staff: staff),
+                  ),
+                ),
+              ),
+              const Divider(),
+              const _SettingsRow(
+                icon: Icons.print_outlined,
+                title: 'Prescription printing',
+                subtitle:
+                    'Uses the hospital prescription form and system printer',
+              ),
+            ],
           ),
         ],
         const SizedBox(height: 18),
-        SoftCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                facility.isHealthCentre
-                    ? Icons.local_hospital_outlined
-                    : Icons.apartment_rounded,
-                color: medqurBlue,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      facility.classificationLabel,
-                      style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(facility.careLevel),
-                    const SizedBox(height: 7),
-                    Text(
-                      facility.referralRole,
-                      style: const TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.35),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        const _ProfileSectionLabel('Security'),
+        const SizedBox(height: 8),
+        _SettingsCard(
+          children: [
+            _SettingsRow(
+              icon: signed
+                  ? Icons.verified_user_outlined
+                  : Icons.info_outline_rounded,
+              title: signed ? 'Signed staff credential' : 'Prototype credential',
+              subtitle: signed
+                  ? 'Badge signature, expiry and revocation are checked by the identity service'
+                  : 'Connect the Medqur identity service for cryptographic badge verification',
+              trailing: _identity.isConfigured
+                  ? IconButton(
+                      tooltip: 'Refresh credential',
+                      onPressed: _loadingBadge ? null : _loadSignedBadge,
+                      icon: const Icon(Icons.refresh_rounded),
+                    )
+                  : null,
+            ),
+            const Divider(),
+            const _SettingsRow(
+              icon: Icons.fingerprint_rounded,
+              title: 'Device authentication',
+              subtitle:
+                  'Biometric/passkey authentication remains separate from the badge QR',
+            ),
+          ],
         ),
-        const SizedBox(height: 18),
-        SoftCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                signed ? Icons.security_rounded : Icons.info_outline_rounded,
-                color: signed ? medqurGreen : medqurAmber,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  signed
-                      ? 'This QR is an Ed25519-signed Medqur staff credential. The QR contains only an opaque credential identifier plus issue/expiry/key metadata. Name, profession, registration and facility are returned only after signature, expiry, revocation and employment checks. Scanning the badge never replaces biometric/passkey sign-in.'
-                      : 'This public build is showing a local prototype QR because the signed identity service is not available. It remains scannable for the demo, but it is not treated as cryptographically verified. Production badges are generated and signed only by the protected identity service.',
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 22),
         OutlinedButton.icon(
           onPressed: widget.onEndShift,
           icon: const Icon(Icons.logout_rounded),
           label: const Text('End shift'),
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, 52),
             foregroundColor: medqurInk,
-            side: const BorderSide(color: medqurLine),
+            minimumSize: const Size(0, 50),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _label(String label, String value, {bool prominent = false}) => Column(
+class _StaffCredentialCard extends StatelessWidget {
+  const _StaffCredentialCard({
+    required this.staff,
+    required this.facility,
+    required this.signed,
+    required this.qrData,
+    this.expiresAt,
+  });
+
+  final StaffProfile staff;
+  final Facility facility;
+  final bool signed;
+  final String qrData;
+  final DateTime? expiresAt;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: medqurNavy,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1011233F),
+              blurRadius: 18,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const MedqurLogo(width: 102),
+                ),
+                const Spacer(),
+                Text(
+                  signed ? 'VERIFIED' : 'PROTOTYPE',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: .68),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .8,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text(
+              staff.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.3,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              staff.title,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: .72),
+                fontSize: 12.5,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _credentialLabel('STAFF ID', staff.id, prominent: true),
+                      const SizedBox(height: 10),
+                      _credentialLabel('FACILITY', facility.name),
+                      if (expiresAt != null) ...[
+                        const SizedBox(height: 10),
+                        _credentialLabel('QR EXPIRES', _date(expiresAt!)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: FakeQr(size: 92, data: qrData),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  static Widget _credentialLabel(
+    String label,
+    String value, {
+    bool prominent = false,
+  }) =>
+      Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: .60),
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
+            style: const TextStyle(
+              color: Color(0xFFAFC0D7),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .7,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: prominent ? 24 : 13,
-              letterSpacing: prominent ? 3 : 0,
+              fontSize: prominent ? 22 : 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: prominent ? 2.4 : 0,
             ),
           ),
         ],
@@ -361,4 +320,93 @@ class _ProfilePageV2State extends State<ProfilePageV2> {
 
   static String _date(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+}
+
+class _ProfileSectionLabel extends StatelessWidget {
+  const _ProfileSectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF68778A),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: medqurLine),
+        ),
+        child: Column(children: children),
+      );
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          child: Row(
+            children: [
+              Icon(icon, color: medqurBlue, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: medqurInk,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF7A8798),
+                        fontSize: 11.5,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
+            ],
+          ),
+        ),
+      );
 }
