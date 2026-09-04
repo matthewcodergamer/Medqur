@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../services/prescription_document.dart';
@@ -17,7 +19,58 @@ class PrescriptionFormPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final template = PrescriptionTemplateImage.bytes();
+    return FutureBuilder<Uint8List>(
+      future: PrescriptionTemplateImage.bytes(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: AspectRatio(
+                aspectRatio: PrescriptionTemplateLayout.imageWidth /
+                    PrescriptionTemplateLayout.imageHeight,
+                child: const ColoredBox(
+                  color: Colors.white,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Prescription form could not be displayed. Reopen the preview before printing.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF687586),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        final template = snapshot.data;
+        if (template == null) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: AspectRatio(
+                aspectRatio: PrescriptionTemplateLayout.imageWidth /
+                    PrescriptionTemplateLayout.imageHeight,
+                child: const ColoredBox(
+                  color: Colors.white,
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              ),
+            ),
+          );
+        }
+        return _buildPreview(context, template);
+      },
+    );
+  }
+
+  Widget _buildPreview(BuildContext context, Uint8List template) {
     final safeSignature = SignatureRendering.onWhitePaper(data.signature.imageBytes);
     final signatureValid = SignatureRendering.looksLikeSignature(safeSignature);
     return Center(
@@ -207,7 +260,8 @@ class PrescriptionFormPreview extends StatelessWidget {
                                   alignment: Alignment.centerLeft,
                                   gaplessPlayback: true,
                                   filterQuality: FilterQuality.high,
-                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
                                 )
                               : Align(
                                   alignment: Alignment.centerLeft,
