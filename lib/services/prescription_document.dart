@@ -103,15 +103,19 @@ abstract final class PrescriptionDocumentService {
             pw.Positioned(
               left: 0,
               top: 0,
-              width: pageWidth,
-              height: pageHeight,
-              child: pw.Image(template, fit: pw.BoxFit.fill),
+              child: pw.SizedBox(
+                width: pageWidth,
+                height: pageHeight,
+                child: pw.Image(template, fit: pw.BoxFit.fill),
+              ),
             ),
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.patientName.x),
               top: y(PrescriptionTemplateLayout.patientName.y),
-              width: x(.64),
-              child: typed(data.patient.name, size: 7.8),
+              child: pw.SizedBox(
+                width: x(.64),
+                child: typed(data.patient.name, size: 7.8),
+              ),
             ),
             if (data.patient.sex.toLowerCase().startsWith('m'))
               pw.Positioned(
@@ -138,8 +142,10 @@ abstract final class PrescriptionDocumentService {
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.ward.x),
               top: y(PrescriptionTemplateLayout.ward.y),
-              width: x(.35),
-              child: typed(data.facility.name, size: 6.8),
+              child: pw.SizedBox(
+                width: x(.35),
+                child: typed(data.facility.name, size: 6.8),
+              ),
             ),
             if (data.patient.status == PatientStatus.discharge)
               pw.Positioned(
@@ -150,20 +156,24 @@ abstract final class PrescriptionDocumentService {
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.docket.x),
               top: y(PrescriptionTemplateLayout.docket.y),
-              width: x(.60),
-              child: typed(data.patient.id, size: 7.4),
+              child: pw.SizedBox(
+                width: x(.60),
+                child: typed(data.patient.id, size: 7.4),
+              ),
             ),
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.rxBody.x),
               top: y(PrescriptionTemplateLayout.rxBody.y),
-              width: x(PrescriptionTemplateLayout.rxBody.w),
-              child: pw.Text(
-                data.prescriptionBody,
-                style: pw.TextStyle(
-                  font: pw.Font.timesItalic(),
-                  fontSize: 11.5,
-                  lineSpacing: 3.2,
-                  color: ink,
+              child: pw.SizedBox(
+                width: x(PrescriptionTemplateLayout.rxBody.w),
+                child: pw.Text(
+                  data.prescriptionBody,
+                  style: pw.TextStyle(
+                    font: pw.Font.timesItalic(),
+                    fontSize: 11.5,
+                    lineSpacing: 3.2,
+                    color: ink,
+                  ),
                 ),
               ),
             ),
@@ -175,15 +185,19 @@ abstract final class PrescriptionDocumentService {
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.doctorName.x),
               top: y(PrescriptionTemplateLayout.doctorName.y),
-              width: x(.34),
-              child: typed(data.staff.name, size: 6.8),
+              child: pw.SizedBox(
+                width: x(.34),
+                child: typed(data.staff.name, size: 6.8),
+              ),
             ),
             pw.Positioned(
               left: x(PrescriptionTemplateLayout.signature.x),
               top: y(PrescriptionTemplateLayout.signature.y),
-              width: x(PrescriptionTemplateLayout.signature.w),
-              height: y(PrescriptionTemplateLayout.signature.h),
-              child: pw.Image(signature, fit: pw.BoxFit.contain),
+              child: pw.SizedBox(
+                width: x(PrescriptionTemplateLayout.signature.w),
+                height: y(PrescriptionTemplateLayout.signature.h),
+                child: pw.Image(signature, fit: pw.BoxFit.contain),
+              ),
             ),
           ],
         ),
