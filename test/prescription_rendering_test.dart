@@ -7,8 +7,10 @@ import 'package:medqur/services/signature_rendering.dart';
 import 'package:medqur/services/signature_vault.dart';
 
 void main() {
-  test('MRH prescription template normalizes to a renderable RGBA PNG', () {
-    final bytes = PrescriptionTemplateImage.bytes();
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('MRH prescription template loads as a renderable RGBA PNG', () async {
+    final bytes = await PrescriptionTemplateImage.bytes();
     expect(bytes, isNotEmpty);
 
     final decoded = img.decodePng(bytes);
