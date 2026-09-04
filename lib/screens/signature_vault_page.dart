@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
+import '../services/signature_rendering.dart';
 import '../services/signature_vault.dart';
 import '../widgets/common.dart';
 import '../widgets/medqur_design.dart';
@@ -84,11 +85,17 @@ class _SignatureVaultPageState extends State<SignatureVaultPage> {
         source,
         ink: options.ink,
       );
+      final prescriptionSafe = SignatureRendering.onWhitePaper(cleaned);
+      if (!SignatureRendering.looksLikeSignature(prescriptionSafe)) {
+        throw const FormatException(
+          'The cleaned image still does not look like handwriting. Retake it on plain white paper with the signature filling the center of the photo.',
+        );
+      }
       await _vault.add(
         staffId: widget.staff.id,
         label: options.label,
         source: DoctorSignatureSource.paperPhoto,
-        imageBytes: cleaned,
+        imageBytes: prescriptionSafe,
         ink: options.ink,
         makeDefault: _items.isEmpty,
       );
@@ -236,6 +243,8 @@ class _SignatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final preview = SignatureRendering.onWhitePaper(signature.imageBytes);
+    final valid = SignatureRendering.looksLikeSignature(preview);
     return SoftCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -249,12 +258,20 @@ class _SignatureCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
               border: Border.all(color: medqurLine),
             ),
-            child: Image.memory(
-              signature.imageBytes,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => const Icon(Icons.draw_outlined),
-            ),
+            child: valid
+                ? Image.memory(
+                    preview,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.draw_outlined),
+                  )
+                : const Center(
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      color: medqurRed,
+                      size: 24,
+                    ),
+                  ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -283,14 +300,20 @@ class _SignatureCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${signature.source == DoctorSignatureSource.drawn ? 'Drawn' : 'Paper photo'} • ${signature.ink.label}',
-                  style: const TextStyle(color: Color(0xFF7A8798), fontSize: 11.5),
+                  valid
+                      ? '${signature.source == DoctorSignatureSource.drawn ? 'Drawn' : 'Paper photo'} • ${signature.ink.label}'
+                      : 'Signature needs to be captured again',
+                  style: TextStyle(
+                    color: valid ? const Color(0xFF7A8798) : medqurRed,
+                    fontSize: 11.5,
+                    fontWeight: valid ? FontWeight.w400 : FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 2,
                   children: [
-                    if (!signature.isDefault)
+                    if (!signature.isDefault && valid)
                       TextButton(onPressed: onDefault, child: const Text('Make default')),
                     TextButton(onPressed: onRename, child: const Text('Rename')),
                     TextButton(
@@ -495,7 +518,7 @@ class _PhotoSignatureDialogState extends State<_PhotoSignatureDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Write the signature on plain white paper in good light. Medqur will crop the pen strokes and remove the paper background.',
+              'Write the signature on plain white paper in good light. Medqur isolates and crops the pen strokes, then normalizes the paper to pure white so it blends into the white prescription form instead of appearing as a dark block.',
             ),
             const SizedBox(height: 14),
             TextField(
