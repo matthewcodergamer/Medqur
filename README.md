@@ -1,153 +1,222 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype for web, iOS and Android. V0.5 adds a safe, test-only NIDS QR workflow on top of the V0.4 Jamaica public-facility directory, V0.3 P1–P4 triage, and V0.2 camera/biometric/wristband/medication-scanning foundation.
+Medqur is a Flutter clinical-workflow prototype for web, Android and iOS, backed by a PostgreSQL/Node clinical-services layer. The project explores a mobile-first workflow for patient identity, triage, secure workforce credentials, medication identification, prescribing, pharmacy, wristbands and point-of-care scanning in a Jamaican public-health setting.
 
-> **Prototype only:** Do not use this repository for real patient identification, NIRA/NIDS verification, diagnosis, treatment decisions, triage, referral acceptance, medication administration or storage of protected health information. Production identity, facility, triage and clinical workflows must be formally validated and governed by Jamaica's Ministry of Health & Wellness, NIRA, the Regional Health Authorities and participating facilities.
+> **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration. Production use requires formal governance, clinical validation, approved identity/data integrations, security review and deployment controls.
 
-## V0.5 — NIDS test credential loop
+## V0.11 — less-is-more clinical UX + prescription printing
 
-V0.5 adds a complete physical testing path for a **clearly fictional Medqur NIDS integration test card**. It does not reproduce or authenticate Jamaica's real National Identification Card.
+V0.11 moves Medqur away from a dense prototype UI toward a restrained clinical interface: more whitespace, smaller information surfaces, stronger hierarchy and fewer technical details shown by default. The goal is modern government/hospital software that remains calm and understandable during long clinical shifts.
 
-### Test credential generator
+### Design direction
 
-- New **NIDS test QR generator** under the Scan workflow.
-- Staff can enter a fictional given name, surname, ISO date of birth and **TEST-** National ID number.
-- Medqur serializes those test fields into a versioned `medqur://nids-test/v1/...` QR payload.
-- The QR is rendered by Flutter's QR library, not by an image-generation model, so the code is genuinely machine-readable.
-- The generator visibly labels the output **TEST ONLY / NOT VALID / NOT GOVERNMENT IDENTIFICATION**.
-- The prototype intentionally forces the test National ID number to use a `TEST-` prefix.
-- Base64URL is only transport encoding; it is not encryption, signing or NIRA authentication.
+- Material 3 with an Apple-simple, government/clinical visual language.
+- Preferred UI family: `Inter`, with platform fallbacks including SF Pro Text, Segoe UI, Roboto and Arial. No font binaries are bundled in the repository.
+- Smaller, more consistent title/body/metadata scales.
+- Compact responsive spacing for phones, tablets and desktop/web.
+- White/light-neutral surfaces, deep navy text, Medqur blue primary actions, Ministry/clinical green for verified states and reserved red/amber for clinical risk.
+- Minimal shadows and restrained rounded corners; less “bubble/card” density.
+- Medication capsule artwork is intentionally limited to low-risk browse surfaces and is not shown during high-risk medication confirmation/administration.
 
-### Registration by scan
+### Real MRH prescription-form renderer
 
-- New Encounter → NIDS / NIC opens the real camera scanner.
-- When a Medqur NIDS TEST QR is scanned, Medqur decodes the same fictional **name, date of birth and TEST NIN** from the code.
-- Patient name and age are automatically prefilled from the scanned test credential.
-- Date of birth and TEST National ID number are stored with the prototype patient record.
-- The encounter timeline explicitly records that the test QR was decoded and that **NIRA verification was not performed**.
-- Unknown codes can still be captured, but they are not treated as verified identity.
+The supplied **Southern Regional Health Authority / Mandeville Regional Hospital** prescription sheet (`SRHA.MRH.CM2013`) is now used as the prototype print template. The uploaded photograph was cropped to the paper, cleaned for contrast and converted to a compact monochrome embedded template so the same form renders on web, Android and iOS.
 
-### Scanner positioning
+Medqur overlays dynamic fields at fixed form coordinates:
 
-- Staff-ID and NIDS scanning now show a full landscape card outline plus a smaller blue machine-code guide on the back-of-card region.
-- Wristband scanning uses a wide horizontal scan area.
-- Medication scanning remains optimized for QR, Data Matrix and common linear package barcodes.
+- patient name
+- sex marker
+- age
+- date
+- clinic/facility
+- discharge indicator
+- docket/patient ID
+- medication and directions
+- copy number
+- doctor name
+- stored doctor signature
 
-### Production boundary
+Patient/system fields use a clean typed style for legibility. Medication directions are rendered with a restrained digital-pen appearance and can use **blue** or **black** ink. The preview UI prefers a handwriting-like family such as Kalam when available; the generated PDF intentionally uses a dependable built-in italic print font so printing never depends on a missing third-party font file.
 
-The V0.5 self-contained QR is for synthetic prototype testing only. A production Medqur deployment should **not place a person's complete identity record or sensitive NIDS data into a client-generated QR code**. Production should use an approved NIRA verification interface and/or an opaque server-issued credential that resolves to authorized identity data after authentication and consent checks.
+### Prescription workflow
 
-## V0.4 — Jamaica public-facility tiers
+Doctor workflow:
 
-Medqur models the public health-service hierarchy directly instead of treating every workplace as a generic hospital or clinic.
+1. Select the patient encounter.
+2. Search the medication catalogue/registry or scan the package.
+3. Enter dose, route, frequency, duration and instructions.
+4. Optionally schedule the first dose.
+5. Choose blue or black prescription ink.
+6. Use the default saved signature or select an alternate signature.
+7. **Sign & preview** the completed hospital prescription.
+8. Print through the operating-system print service or save/share the generated PDF.
 
-### Hospital classes
+Medication search and barcode resolution remain linked to the medication-master trust model. An observed/public product match is not automatically treated as a Jamaica-approved clinical product.
 
-- **Type A hospital** — comprehensive tertiary and secondary care, major specialties/subspecialties, advanced diagnostics and the highest general referral tier.
-- **Type B hospital** — standard secondary care across the core clinical disciplines, with escalation to Type A or specialist care when required.
-- **Type C hospital** — district secondary care with stabilisation and transfer for cases beyond local capability.
-- **Specialist hospital** — focused institutions such as paediatric, maternity, respiratory, mental-health, rehabilitation and oncology services.
+### Doctor signature vault
 
-### Health-centre classes
+Doctors can maintain multiple reusable signature assets from the Profile → Signatures screen.
 
-- **Type 1** — community preventive and maternal/child health outpost, typically serving under 4,000 people.
-- **Type 2** — standard community primary care, typically serving up to 12,000 people.
-- **Type 3** — full-service district primary-care hub, typically serving up to 20,000 people.
-- **Type 4** — parish-level comprehensive primary-care and programme-coordination centre, typically serving 20,000–30,000 people.
-- **Type 5** — comprehensive urban primary-care hub, typically serving more than 30,000 people with multidisciplinary services, diagnostics and specialised clinics.
+Supported creation paths:
 
-### Facility-directory implementation
+- **Draw on device** using a finger or stylus. Medqur stores normalized vector strokes and renders a transparent signature image.
+- **Photo from paper** using the phone camera. The doctor signs clean white paper; Medqur detects pen strokes, crops them, removes the paper background and normalizes them to blue or black transparent artwork.
 
-- A data-driven Jamaica public-facility catalogue contains the supplied Type A/B/C hospitals, national specialist institutions and the named Type 1–5 health centres across the parishes.
-- Facility records carry a structured classification, parish, care level, typical capability summary, population band where relevant, specialist focus and referral-role description.
-- Shift selection shows the authorized site's tier and care level instead of a generic facility label.
-- The **Jamaica facility directory** lets staff search by name, town or specialty, filter by A/B/C, specialist or Type 1–5 classification, and filter by parish/service area.
-- Facility detail sheets explain the typical role, capability envelope and referral position of each tier.
-- The staff profile and active clinical shell show the current facility tier.
-- Starting a shift remains restricted to the staff profile's authorized facilities; browsing the directory does not grant access.
+Signature features:
 
-The V0.4 catalogue is intentionally replaceable. In production, the seed data must be replaced by an authoritative Ministry/RHA registry with live service availability, staffing, opening hours, bed state and transfer-acceptance data. Medqur does not automatically choose a transfer destination based only on static classification.
+- multiple signatures per doctor
+- one default signature
+- alternate signature selection per prescription
+- rename/delete/default controls
+- reusable transparent signature preview
+- per-prescription SHA-256 attestation payload
 
-## V0.3 — P1–P4 emergency triage
+A stored signature image is **not authentication by itself**. The authoritative signer identity remains the authenticated Medqur health-worker account, six-digit staff ID, role/facility authorization, timestamp and audit event. A production deployment should protect reusable signature assets in an encrypted server-side vault or hardware-backed device storage according to approved policy.
 
-Medqur presents the emergency priority levels directly in the encounter workflow and patient queue:
+## Workforce identity
 
-- **P1 • Critical** — life-threatening emergency requiring immediate life-saving intervention; route directly to resuscitation.
-- **P2 • Emergent** — severe or potentially life-threatening condition requiring rapid medical assessment and urgent treatment; route to a priority treatment area.
-- **P3 • Intermediate** — stable, more complicated condition requiring medical care that can be delayed safely for a reasonable period, with reassessment while waiting.
-- **P4 • Fast track** — minor, non-acute or routine presentation appropriate for fast-track care and the lowest emergency queue priority.
+Medqur models a unique **six-digit staff number** for health workers and supports an opaque signed workforce badge credential. Production-style staff QR credentials are designed so the QR itself does not expose the employee’s name, licence, profession or facility permissions.
 
-### Triage workflow changes
+The identity service can verify:
 
-- New encounters use four large P1–P4 selection cards instead of generic Critical/Urgent/Moderate/Routine chips.
-- Each priority shows a short acuity description and routing action before the nurse confirms it.
-- P1 and P2 selections produce a prominent routing warning so they are not treated like routine waiting cases.
-- Patient wristbands show the P-level and clinical label.
-- Patient cards throughout the app inherit P1–P4 labels from the central triage helpers.
-- The active patient queue is ordered **P1 → P2 → P3 → P4**.
-- The queue dashboard shows a live count for every P-level and an additional P1/P2 urgency notice when high-priority patients are active.
-- Existing stored V0.2 prototype records remain compatible because the internal persisted enum names were intentionally left unchanged.
+- credential signature
+- expiry
+- revocation state
+- active staff account
+- current role
+- authorized facility
 
-Triage classification remains a clinician-entered decision. The prototype does not attempt to diagnose a patient or automatically assign a P-level from symptoms or vital signs.
+The badge identifies the account; device biometric/passkey authentication verifies the person using the device.
 
-## V0.2 foundation retained
+Current development fixtures include a doctor, nurse and pharmacist. Fixture data is synthetic and is not an official healthcare-worker registry.
 
-### Real device functionality
+## NIDS / NIC workflow
 
-- Live camera scanner on Android, iOS and the HTTPS web build.
-- Camera permission request handled by the scanner/browser/OS.
-- QR, Data Matrix and common linear barcode capture for staff, identity, wristband and medication workflows.
-- Staff badge camera overlay, NIDS/NIC card overlay, wristband frame and medication barcode frame.
-- Native Android/iOS fingerprint/Face ID authentication through `local_auth`.
-- Scannable staff badge and patient encounter QR tokens.
-- Local prototype persistence so demo patients/orders survive restarts/refreshes.
-- Doctor/nurse role policy boundary.
-- Patient assignment.
-- Doctor medication orders with an optional mapped package barcode.
-- Nurse closed-loop flow: scan patient wristband, scan medication package, require both to match, then record administration.
-- FHIR-shaped integration adapter boundary.
+The app supports camera scanning and a Medqur **test-only** NIDS credential loop for synthetic patient-registration testing. A test QR can prefill fictional name/date-of-birth/test NIN information.
 
-### Not connected yet
+Unknown/opaque NIC data can be captured and fingerprinted, but Medqur does not label a real Jamaican NIC as verified without the authorized NIRA verification boundary. The public repository does not guess or reverse-engineer a production NIRA QR/API contract.
 
-- NIRA/NIDS production verification
-- Ministry of Health production identity/services
-- authoritative Ministry/RHA facility registry
-- live hospital capacity / bed-state / transfer-acceptance service
-- e-Care / SystmOne
-- secure browser passkey relying-party server
-- production cross-device realtime backend
-- production clinical database or audit service
-- production printer bridge / Zebra wristband output
+A production flow should use NIRA-approved identity verification and return only the minimum authorized identity attributes needed for patient matching.
 
-The browser build can use the camera, but secure browser passkeys require a server-generated WebAuthn challenge. The public web build does not fake that security step.
+## Medication identification and pharmacy
 
-## Medication identification
+Medication scanning accepts common real package formats including:
 
-Medqur does **not** require every medicine to receive a custom Medqur QR. The scanner accepts both 2D and linear codes. In production, a scanned GTIN/GS1 DataMatrix or other approved package code (or a hospital-generated unit-dose code where necessary) would resolve against an approved medication/product master before it can match an active order.
+- GS1 DataMatrix
+- EAN / UPC
+- Code 128 and other supported linear barcodes
+- QR where relevant
 
-## Demo staff IDs
+The parser can extract/normalize GTIN, lot/batch, manufacture/best-before/expiry dates and serial information when encoded. It also handles bracket/colon representations observed from some pharmaceutical DataMatrix scanners.
 
-- Doctor: `MQ-7K4P-92XF`
-- Nurse: `MQ-2N8R-41KD`
+Resolution order is designed around trust:
 
-The ID field starts empty. Use **Use demo ID** for quick public-prototype access.
+1. configured Medqur/Jamaica medication registry
+2. approved/local medication master/cache
+3. observed-package fixture/reference data
+4. public terminology/reference sources where appropriate
+5. pharmacist verification when unresolved
 
-## Branding
+The PostgreSQL pharmacy backend supports medication products/identifiers/ingredients, receiving, lot/expiry inventory, product verification, dispensing, recall impact queries, administration records, unit-dose DataMatrix labels, audit/outbox events, signed offline catalog releases and FHIR-shaped medication endpoints.
 
-The Medqur wordmark is drawn as vector UI instead of the old raster image, eliminating the grey rectangle visible in some browsers. `assets/medqur_app_icon.svg` is the canonical high-quality app/favicon artwork: blue Medqur mark on white. CI generates Android, iOS and web raster icon sizes from the same geometry.
+Unknown products remain unknown rather than being guessed.
+
+## Triage and patient workflow
+
+- P1–P4 triage categories.
+- NIDS/NIC test scan or emergency/unknown patient registration.
+- Editable patient identity/encounter state.
+- Patient wristband generation and scanning.
+- Patient queue ordered by acuity.
+- Doctor order / prescription workflow.
+- Pharmacy and nurse medication-task workflow.
+- Closed-loop patient-wristband + medication-package checks.
+- Local prototype persistence and an integration boundary for realtime/backend synchronization.
+
+Triage remains clinician-entered. The prototype does not automatically diagnose a patient or assign a priority from symptoms alone.
+
+## Printing
+
+### Wristbands
+
+The prototype generates a dynamic wristband PDF from patient/encounter data and opens the OS print service. It can be tested with an HP LaserJet P2035n using normal print/PDF workflows. A future facility Print Bridge/Zebra adapter can route jobs directly to configured healthcare wristband printers.
+
+### Prescriptions
+
+V0.11 generates the SRHA/MRH prescription form as a print-ready PDF with dynamic patient/prescriber information, medication directions and the selected stored signature. The print action uses the native/system print flow on supported Flutter platforms.
+
+A production deployment must validate the legal/clinical requirements for electronic/printed prescriptions, signature policy, controlled medicines and pharmacy acceptance before use.
+
+## Backend and security boundaries
+
+The backend uses Node/TypeScript and PostgreSQL and includes:
+
+- role/facility authorization boundaries
+- medication master and pharmacy tables
+- append-only audit/event patterns
+- realtime event stream boundary
+- signed staff credential service
+- signed/versioned medication catalog support
+- FHIR-shaped medication resources
+- prescription-signature database columns and integrity constraints
+
+The public prototype still requires authorized external infrastructure for production-grade NIRA, Ministry/RHA workforce, OIDC/passkeys, e-Care/SystmOne, authoritative Jamaican formulary/regulatory feeds and approved drug-interaction knowledge.
 
 ## Build
 
-GitHub Actions regenerates the Flutter platform scaffolding, adds camera/biometric permissions, creates branded icons, runs analysis, and builds:
+GitHub Actions is the release gate on `main` and performs:
 
-- Android release APK
-- Flutter web release + `gh-pages`
-- unsigned iOS release app
+- backend dependency install and TypeScript typecheck
+- PostgreSQL schema startup/validation
+- live medication-registry smoke test
+- signed staff-ID smoke test
+- Flutter dependency install
+- `flutter analyze`
+- functional Flutter tests
+- Android release APK build
+- Flutter web release build and `gh-pages` publication
+- unsigned iOS release build/package
 
-The workflow is the release gate for every push to `main`.
+Local Flutter development:
 
-See `.github/workflows/build.yml`.
+```bash
+flutter pub get
+flutter run
+```
 
-## Architecture
+Build examples:
 
-See [`docs/V0.2_ARCHITECTURE.md`](docs/V0.2_ARCHITECTURE.md) for the backend, FHIR, role, realtime and security boundaries.
+```bash
+flutter build apk --release
+flutter build web --release --base-href "/Medqur/"
+flutter build ios --release --no-codesign
+```
+
+The unsigned iOS artifact is a build-validation artifact; normal iPhone distribution requires Apple signing/provisioning or TestFlight/App Store deployment.
+
+## Repository structure
+
+- `lib/screens/` — clinical, pharmacy, scan, identity and prescription workflows
+- `lib/services/` — medication registry, pharmacy API, NIDS, persistence, signature vault and print document generation
+- `lib/widgets/` — design system, scanner helpers, signature pad and prescription-form preview
+- `lib/generated/prescription_template_data.dart` — cleaned embedded MRH prescription form used for prototype printing
+- `backend/` — PostgreSQL/Node medication, pharmacy, identity, audit and FHIR-shaped service layer
+- `.github/workflows/build.yml` — cross-platform CI/release validation
+
+## Next production stages
+
+Priority work after V0.11:
+
+- server-side encrypted signature-vault synchronization and retention policy
+- complete server-side signature-payload digest verification on prescription submission
+- authoritative Jamaica medication/formulary/regulatory feed
+- approved structured drug-allergy/interaction knowledge base
+- production OIDC/passkey sessions and device management
+- NIRA test/production integration under authorized specifications
+- e-Care/SystmOne integration under Ministry/vendor-approved interfaces
+- realtime multi-device patient/order/pharmacy synchronization
+- offline conflict-safe medication workflows
+- Print Bridge plus Zebra healthcare wristband/label integration
+- accessibility, usability and clinical human-factors validation
+
+Medqur’s architecture intentionally keeps these external integrations behind adapters so the public prototype does not impersonate an official government service.
