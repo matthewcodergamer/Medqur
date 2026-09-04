@@ -45,13 +45,21 @@ abstract final class PrescriptionTemplateImage {
     var printedPixels = 0;
     var minLuminance = 255.0;
     var maxLuminance = 0.0;
+    final isGrayscale = decoded.numChannels == 1 || decoded.numChannels == 2;
 
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
         final p = decoded.getPixel(x, y);
-        final r = _channel8(p.r.toDouble());
-        final g = _channel8(p.g.toDouble());
-        final b = _channel8(p.b.toDouble());
+        final sourceR = _channel8(p.r.toDouble());
+
+        // package:image exposes grayscale PNG intensity through `r`; the g/b
+        // accessors are zero for a one-channel image. Replicate that intensity
+        // across RGB instead of treating those zeros as actual green/blue data.
+        // Without this, white paper becomes dark red during validation/rendering
+        // and the legitimate prescription is rejected as an empty form.
+        final r = sourceR;
+        final g = isGrayscale ? sourceR : _channel8(p.g.toDouble());
+        final b = isGrayscale ? sourceR : _channel8(p.b.toDouble());
         final luminance = .299 * r + .587 * g + .114 * b;
 
         if (luminance > 245) lightPixels++;
