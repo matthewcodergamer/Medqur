@@ -1,34 +1,31 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 
-import '../generated/prescription_template_data.dart'
-    show kPrescriptionTemplatePngBase64;
-
-/// Returns the supplied SRHA/MRH prescription form as a conventional opaque
-/// RGBA PNG that behaves the same in Flutter web, native Flutter and the PDF
-/// renderer.
+/// Loads the supplied SRHA/MRH prescription form as a conventional opaque RGBA
+/// PNG that behaves the same in Flutter web, Android, iOS and the PDF renderer.
 ///
-/// The embedded source is deliberately an ordinary 8-bit grayscale PNG. Older
-/// revisions used a tiny 1-bit/transparency-masked PNG, which some decoder paths
-/// interpreted as a mask and could turn into a blank white page or solid block.
+/// The source file is stored as a normal Flutter asset rather than as a giant
+/// Dart/base64 constant. The exact form image supplied for the Medqur prototype
+/// is decoded, validated and flattened onto opaque white paper before use.
 abstract final class PrescriptionTemplateImage {
-  static Uint8List? _cache;
+  static const String assetPath = 'assets/forms/mrh_prescription.png';
 
-  static Uint8List bytes() {
-    final cached = _cache;
-    if (cached != null) return cached;
+  static Future<Uint8List>? _cache;
 
-    final encoded = kPrescriptionTemplatePngBase64.replaceAll(
-      RegExp(r'\s+'),
-      '',
+  static Future<Uint8List> bytes() => _cache ??= _load();
+
+  static Future<Uint8List> _load() async {
+    final byteData = await rootBundle.load(assetPath);
+    final compact = byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
     );
-    final compact = Uint8List.fromList(base64Decode(encoded));
     final decoded = img.decodePng(compact);
     if (decoded == null) {
       throw const FormatException(
-        'The embedded prescription form could not be decoded.',
+        'The bundled prescription form could not be decoded.',
       );
     }
     if (decoded.width != 627 || decoded.height != 1114) {
@@ -73,13 +70,11 @@ abstract final class PrescriptionTemplateImage {
     final contrast = maxLuminance - minLuminance;
     if (printedPixels < 100 || lightRatio < .50 || contrast < 8) {
       throw const FormatException(
-        'The embedded prescription form decoded without usable printed content.',
+        'The bundled prescription form decoded without usable printed content.',
       );
     }
 
-    final result = Uint8List.fromList(img.encodePng(normalized, level: 6));
-    _cache = result;
-    return result;
+    return Uint8List.fromList(img.encodePng(normalized, level: 6));
   }
 
   /// `package:image` normally exposes 8-bit PNG channels as 0..255. Retain a
