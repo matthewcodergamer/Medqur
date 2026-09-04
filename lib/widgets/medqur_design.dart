@@ -372,7 +372,7 @@ class CapsuleIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
         width: width,
-        height: width * .62,
+        height: width * .60,
         child: CustomPaint(painter: _CapsulePainter()),
       );
 }
@@ -381,11 +381,11 @@ class _CapsulePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.translate(size.width * .17, size.height * .10);
+    canvas.translate(size.width * .19, size.height * .10);
     canvas.rotate(-math.pi / 15);
 
-    final capsuleWidth = size.width * .64;
-    final capsuleHeight = size.height * .50;
+    final capsuleWidth = size.width * .62;
+    final capsuleHeight = size.height * .56;
     final shadowRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(3, 4, capsuleWidth, capsuleHeight),
       Radius.circular(capsuleHeight / 2),
