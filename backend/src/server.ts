@@ -46,7 +46,7 @@ function parseDate(value?: string | null): string | null {
 
 app.get('/health', async (_req, res) => {
   try {
-    res.json({ ok: await healthCheck(), service: 'medqur-pharmacy', version: '0.9.0' });
+    res.json({ ok: await healthCheck(), service: 'medqur-pharmacy', version: '0.11.1' });
   } catch (error) {
     res.status(503).json({ ok: false, error: String(error) });
   }
@@ -434,11 +434,59 @@ const orderSchema = z.object({
   dueAt: z.string().datetime().optional(),
   earlyGraceMinutes: z.number().int().nonnegative().default(30),
   lateGraceMinutes: z.number().int().nonnegative().default(60),
+  signaturePayload: z.string().min(2).max(50000),
+  signatureSha256: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  signatureSignedAt: z.string().datetime(),
+  signatureMethod: z.string().regex(/^[a-z0-9-]{3,64}$/),
 });
 
 app.post('/v1/orders', requireRoles('doctor'), async (req, res) => {
   const input = orderSchema.parse(req.body);
   if (!requireFacility(req, res, input.facilityId)) return;
+
+  const expectedDigest = createHash('sha256')
+    .update(input.signaturePayload, 'utf8')
+    .digest('hex');
+  const suppliedDigest = input.signatureSha256.toLowerCase();
+  if (expectedDigest !== suppliedDigest) {
+    res.status(400).json({ error: 'Prescription signature digest does not match the supplied signature payload.' });
+    return;
+  }
+
+  let signatureMeta: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(input.signaturePayload);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Signature payload must be a JSON object.');
+    }
+    signatureMeta = parsed as Record<string, unknown>;
+  } catch {
+    res.status(400).json({ error: 'Prescription signature payload is not valid JSON.' });
+    return;
+  }
+
+  const authenticatedStaffId = staff(req);
+  if (signatureMeta.prescriberId !== authenticatedStaffId) {
+    res.status(400).json({ error: 'Prescription signature prescriber does not match the authenticated doctor.' });
+    return;
+  }
+  const payloadUsedAt = typeof signatureMeta.usedAt === 'string'
+    ? Date.parse(signatureMeta.usedAt)
+    : Number.NaN;
+  const signedAt = Date.parse(input.signatureSignedAt);
+  if (!Number.isFinite(signedAt)) {
+    res.status(400).json({ error: 'Prescription signature time is invalid.' });
+    return;
+  }
+  if (Number.isFinite(payloadUsedAt) && Math.abs(payloadUsedAt - signedAt) > 5_000) {
+    res.status(400).json({ error: 'Prescription signature times do not match.' });
+    return;
+  }
+  if (signedAt > Date.now() + 5 * 60_000) {
+    res.status(400).json({ error: 'Prescription signature time is too far in the future.' });
+    return;
+  }
+
   const order = await withTransaction(async (client) => {
     await client.query(
       `INSERT INTO patients(id, encounter_id, facility_id)
@@ -449,8 +497,9 @@ app.post('/v1/orders', requireRoles('doctor'), async (req, res) => {
     const result = await client.query(
       `INSERT INTO medication_orders(
          patient_id, encounter_id, facility_id, product_id, medication_text,
-         dose, route, frequency, ordered_by, due_at, early_grace_minutes, late_grace_minutes
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         dose, route, frequency, ordered_by, due_at, early_grace_minutes, late_grace_minutes,
+         signature_payload, signature_sha256, signature_signed_at, signature_method, signature_version
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,2)
        RETURNING *`,
       [
         input.patientId,
@@ -461,17 +510,32 @@ app.post('/v1/orders', requireRoles('doctor'), async (req, res) => {
         input.dose,
         input.route,
         input.frequency,
-        staff(req),
+        authenticatedStaffId,
         input.dueAt ?? null,
         input.earlyGraceMinutes,
         input.lateGraceMinutes,
+        input.signaturePayload,
+        suppliedDigest,
+        input.signatureSignedAt,
+        input.signatureMethod,
       ],
     );
     const row = result.rows[0];
     await appendAudit(client, {
-      actorId: staff(req), actorRole: role(req), facilityId: input.facilityId,
-      eventType: 'medication.order.signed', entityType: 'MedicationRequest', entityId: String(row.id),
-      details: { patientId: input.patientId, productId: input.productId ?? null, dueAt: input.dueAt ?? null },
+      actorId: authenticatedStaffId,
+      actorRole: role(req),
+      facilityId: input.facilityId,
+      eventType: 'medication.order.signed',
+      entityType: 'MedicationRequest',
+      entityId: String(row.id),
+      details: {
+        patientId: input.patientId,
+        productId: input.productId ?? null,
+        dueAt: input.dueAt ?? null,
+        signatureSha256: suppliedDigest,
+        signatureMethod: input.signatureMethod,
+        signatureVersion: 2,
+      },
     });
     await emitOutbox(client, {
       topic: 'medication-orders', facilityId: input.facilityId,
@@ -748,7 +812,6 @@ app.get('/v1/events', async (req, res) => {
       const parsed = JSON.parse(event) as { facilityId?: string | null };
       if (facilityId && parsed.facilityId && parsed.facilityId !== facilityId) return;
     } catch {
-      // If an event cannot be parsed, do not leak it to clients.
       return;
     }
     res.write(`event: medqur\ndata: ${event}\n\n`);
