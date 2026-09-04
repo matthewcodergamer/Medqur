@@ -238,6 +238,10 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
           frequency: _frequency,
           productId: _uuid(_resolution?.product?.id) ? _resolution?.product?.id : null,
           dueAt: _scheduledAt,
+          signaturePayload: signature.payload,
+          signatureSha256: signature.digest,
+          signatureSignedAt: signature.signedAt,
+          signatureMethod: 'handwritten-vector',
         );
         final order = response['order'];
         if (order is Map<String, dynamic>) backendOrderId = order['id']?.toString();
