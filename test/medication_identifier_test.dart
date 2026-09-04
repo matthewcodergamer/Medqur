@@ -123,12 +123,31 @@ void main() {
         'Neurobalin-75',
       );
       expect(
-        MedicationMasterCatalog.search('cephalosporin').first.brandName,
-        'CEFUR',
+        MedicationMasterCatalog.search('cephalosporin')
+            .any((item) => item.brandName == 'CEFUR'),
+        isTrue,
       );
       expect(
         MedicationMasterCatalog.search('Mucinex').first.genericName,
         contains('Guaifenesin'),
+      );
+    });
+
+    test('expanded prototype catalogue supports common name/form searches', () {
+      expect(
+        MedicationMasterCatalog.search('amlodipine 5 mg')
+            .any((item) => item.genericName == 'Amlodipine'),
+        isTrue,
+      );
+      expect(
+        MedicationMasterCatalog.search('inhaler')
+            .any((item) => item.genericName == 'Salbutamol'),
+        isTrue,
+      );
+      expect(
+        MedicationMasterCatalog.search('ceftriaxone')
+            .every((item) => item.clinicallyVerified == false),
+        isTrue,
       );
     });
   });
