@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models.dart';
 import 'prescription_template_image.dart';
+import 'signature_rendering.dart';
 import 'signature_vault.dart';
 
 class PrescriptionPrintData {
@@ -72,7 +73,13 @@ abstract final class PrescriptionDocumentService {
   static Future<Uint8List> build(PrescriptionPrintData data) async {
     final document = pw.Document();
     final template = pw.MemoryImage(PrescriptionTemplateImage.bytes());
-    final signature = pw.MemoryImage(data.signature.imageBytes);
+    final safeSignature = SignatureRendering.onWhitePaper(data.signature.imageBytes);
+    if (!SignatureRendering.looksLikeSignature(safeSignature)) {
+      throw const FormatException(
+        'The saved signature image is not usable. Capture it again on clean white paper or draw it in Medqur before printing.',
+      );
+    }
+    final signature = pw.MemoryImage(safeSignature);
     final pageWidth = 148 * PdfPageFormat.mm;
     final pageHeight = pageWidth *
         (PrescriptionTemplateLayout.imageHeight /
