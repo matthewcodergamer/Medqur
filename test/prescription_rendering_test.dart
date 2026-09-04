@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:medqur/services/prescription_template_image.dart';
+import 'package:medqur/services/signature_rendering.dart';
 import 'package:medqur/services/signature_vault.dart';
 
 void main() {
@@ -117,5 +118,26 @@ void main() {
     final fill = visible / total;
     expect(fill, greaterThan(.005));
     expect(fill, lessThan(.24));
+
+    final whitePaperBytes = SignatureRendering.onWhitePaper(output);
+    expect(SignatureRendering.looksLikeSignature(whitePaperBytes), isTrue);
+    final whitePaper = img.decodePng(whitePaperBytes);
+    expect(whitePaper, isNotNull);
+
+    var whitePixels = 0;
+    var darkPixels = 0;
+    for (var y = 0; y < whitePaper!.height; y++) {
+      for (var x = 0; x < whitePaper.width; x++) {
+        final p = whitePaper.getPixel(x, y);
+        expect(p.a, 255);
+        final lum = .299 * p.r + .587 * p.g + .114 * p.b;
+        if (lum > 245) whitePixels++;
+        if (lum < 110) darkPixels++;
+      }
+    }
+    final pixels = whitePaper.width * whitePaper.height;
+    expect(whitePixels / pixels, greaterThan(.55));
+    expect(darkPixels / pixels, greaterThan(.001));
+    expect(darkPixels / pixels, lessThan(.34));
   });
 }
