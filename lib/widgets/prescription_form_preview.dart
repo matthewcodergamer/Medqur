@@ -43,7 +43,11 @@ class PrescriptionFormPreview extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 fontStyle: FontStyle.italic,
                 fontFamily: 'Kalam',
-                fontFamilyFallback: const ['Bradley Hand', 'Segoe Print', 'cursive'],
+                fontFamilyFallback: const [
+                  'Bradley Hand',
+                  'Segoe Print',
+                  'cursive',
+                ],
               );
 
               return DecoratedBox(
@@ -61,31 +65,56 @@ class PrescriptionFormPreview extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Positioned.fill(
-                        child: Image.memory(
-                          template,
-                          fit: BoxFit.fill,
-                          filterQuality: FilterQuality.high,
+                      Image.memory(
+                        template,
+                        key: ValueKey<int>(template.length),
+                        fit: BoxFit.fill,
+                        gaplessPlayback: true,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.white,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.all(24),
+                          child: const Text(
+                            'Prescription form could not be displayed. Reopen the preview before printing.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF687586),
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                       _positioned(
                         constraints,
                         PrescriptionTemplateLayout.patientName,
                         width: .63,
-                        child: Text(data.patient.name, maxLines: 1, overflow: TextOverflow.clip, style: typed),
+                        child: Text(
+                          data.patient.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: typed,
+                        ),
                       ),
                       if (data.patient.sex.toLowerCase().startsWith('m'))
                         _positioned(
                           constraints,
                           PrescriptionTemplateLayout.maleMark,
-                          child: Text('X', style: typed.copyWith(fontWeight: FontWeight.w800)),
+                          child: Text(
+                            'X',
+                            style: typed.copyWith(fontWeight: FontWeight.w800),
+                          ),
                         ),
                       if (data.patient.sex.toLowerCase().startsWith('f'))
                         _positioned(
                           constraints,
                           PrescriptionTemplateLayout.femaleMark,
-                          child: Text('X', style: typed.copyWith(fontWeight: FontWeight.w800)),
+                          child: Text(
+                            'X',
+                            style: typed.copyWith(fontWeight: FontWeight.w800),
+                          ),
                         ),
                       _positioned(
                         constraints,
@@ -95,19 +124,36 @@ class PrescriptionFormPreview extends StatelessWidget {
                       _positioned(
                         constraints,
                         PrescriptionTemplateLayout.date,
-                        child: Text(_date(data.createdAt), style: typed.copyWith(fontSize: constraints.maxWidth * .0155)),
+                        child: Text(
+                          _date(data.createdAt),
+                          style: typed.copyWith(
+                            fontSize: constraints.maxWidth * .0155,
+                          ),
+                        ),
                       ),
                       _positioned(
                         constraints,
                         PrescriptionTemplateLayout.ward,
                         width: .35,
-                        child: Text(data.facility.name, maxLines: 1, overflow: TextOverflow.clip, style: typed.copyWith(fontSize: constraints.maxWidth * .0145)),
+                        child: Text(
+                          data.facility.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: typed.copyWith(
+                            fontSize: constraints.maxWidth * .0145,
+                          ),
+                        ),
                       ),
                       if (data.patient.status.name == 'discharge')
                         _positioned(
                           constraints,
                           PrescriptionTemplateLayout.discharged,
-                          child: Text('YES', style: typed.copyWith(fontSize: constraints.maxWidth * .014)),
+                          child: Text(
+                            'YES',
+                            style: typed.copyWith(
+                              fontSize: constraints.maxWidth * .014,
+                            ),
+                          ),
                         ),
                       _positioned(
                         constraints,
@@ -124,13 +170,25 @@ class PrescriptionFormPreview extends StatelessWidget {
                       _positioned(
                         constraints,
                         PrescriptionTemplateLayout.copyNumber,
-                        child: Text(data.copyNumber, style: typed.copyWith(fontSize: constraints.maxWidth * .0145)),
+                        child: Text(
+                          data.copyNumber,
+                          style: typed.copyWith(
+                            fontSize: constraints.maxWidth * .0145,
+                          ),
+                        ),
                       ),
                       _positioned(
                         constraints,
                         PrescriptionTemplateLayout.doctorName,
                         width: .34,
-                        child: Text(data.staff.name, maxLines: 1, overflow: TextOverflow.clip, style: typed.copyWith(fontSize: constraints.maxWidth * .0145)),
+                        child: Text(
+                          data.staff.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: typed.copyWith(
+                            fontSize: constraints.maxWidth * .0145,
+                          ),
+                        ),
                       ),
                       Positioned(
                         left: x(PrescriptionTemplateLayout.signature.x),
@@ -141,7 +199,9 @@ class PrescriptionFormPreview extends StatelessWidget {
                           data.signature.imageBytes,
                           fit: BoxFit.contain,
                           alignment: Alignment.centerLeft,
+                          gaplessPlayback: true,
                           filterQuality: FilterQuality.high,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                         ),
                       ),
                     ],
