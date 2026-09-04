@@ -126,16 +126,18 @@ void main() {
 
     var whitePixels = 0;
     var darkPixels = 0;
+    var nonOpaque = 0;
     for (var y = 0; y < whitePaper!.height; y++) {
       for (var x = 0; x < whitePaper.width; x++) {
         final p = whitePaper.getPixel(x, y);
-        expect(p.a, 255);
+        if (p.a != 255) nonOpaque++;
         final lum = .299 * p.r + .587 * p.g + .114 * p.b;
         if (lum > 245) whitePixels++;
         if (lum < 110) darkPixels++;
       }
     }
     final pixels = whitePaper.width * whitePaper.height;
+    expect(nonOpaque, 0);
     expect(whitePixels / pixels, greaterThan(.55));
     expect(darkPixels / pixels, greaterThan(.001));
     expect(darkPixels / pixels, lessThan(.34));
