@@ -8,12 +8,12 @@ import '../generated/prescription_template_data.dart'
 
 /// Returns the embedded SRHA/MRH prescription form as a conventional RGBA PNG.
 ///
-/// The compact source is line-wrapped base64 and uses a space-efficient,
-/// low-bit-depth PNG pixel format. Some image decoders expose 1-bit channel
-/// values as 0/1 rather than expanding them to 0/255. This normalizer detects
-/// that channel range, expands it to full 8-bit RGB, fixes an inverted palette
-/// when necessary, and emits the same RGBA PNG for Flutter web, native Flutter
-/// and the PDF renderer.
+/// The compact source is line-wrapped base64 and uses a very small monochrome
+/// PNG representation. Depending on the decoder, that source may expose its
+/// paper/ink information through 1-bit RGB values, an alpha mask, or an indexed
+/// palette. This normalizer converts all of those cases to an ordinary black-on-
+/// white 8-bit RGBA image so Flutter web, native Flutter and the PDF renderer see
+/// the same prescription form instead of a grey/black placeholder.
 abstract final class PrescriptionTemplateImage {
   static Uint8List? _cache;
 
@@ -33,42 +33,62 @@ abstract final class PrescriptionTemplateImage {
       );
     }
 
-    // Determine the numeric range exposed by the decoder. Indexed/1-bit PNGs
-    // can report channel values as 0/1, which would otherwise become an almost
-    // solid black image when copied directly into an 8-bit RGBA image.
-    var sampledMax = 0.0;
-    for (var y = 0; y < decoded.height; y += 12) {
-      for (var x = 0; x < decoded.width; x += 12) {
+    var rgbMax = 0.0;
+    var alphaMin = double.infinity;
+    var alphaMax = 0.0;
+    for (var y = 0; y < decoded.height; y += 8) {
+      for (var x = 0; x < decoded.width; x += 8) {
         final p = decoded.getPixel(x, y);
-        sampledMax = _max4(
-          sampledMax,
+        rgbMax = _max4(
+          rgbMax,
           p.r.toDouble(),
           p.g.toDouble(),
           p.b.toDouble(),
         );
+        final alpha = p.a.toDouble();
+        if (alpha < alphaMin) alphaMin = alpha;
+        if (alpha > alphaMax) alphaMax = alpha;
       }
     }
 
-    final scale = sampledMax <= 1.5
-        ? 255.0
-        : sampledMax <= 15.5
-            ? 17.0
-            : sampledMax <= 31.5
-                ? 255.0 / 31.0
-                : sampledMax <= 63.5
-                    ? 255.0 / 63.0
-                    : 1.0;
+    final rgbScale = _rangeScale(rgbMax);
+    final alphaScale = _rangeScale(alphaMax);
 
-    // A prescription form is overwhelmingly light paper with dark ink. If an
-    // indexed palette is decoded in reverse, detect that from representative
-    // samples and invert during normalization.
+    // Some ultra-compact monochrome PNGs store a solid black RGB value and use
+    // alpha only as the ink mask. In that case a direct RGB copy produces one
+    // giant black rectangle. Treat transparent/low-alpha pixels as white paper
+    // and opaque/high-alpha pixels as black ink instead.
+    final alphaCarriesInk = rgbMax <= 0.5 && alphaMax > alphaMin;
+
+    List<int> compositePixel(img.Pixel pixel) {
+      if (alphaCarriesInk) {
+        final alpha = _to8Bit(pixel.a.toDouble() * alphaScale);
+        final paper = 255 - alpha;
+        return [paper, paper, paper];
+      }
+
+      final r = _to8Bit(pixel.r.toDouble() * rgbScale);
+      final g = _to8Bit(pixel.g.toDouble() * rgbScale);
+      final b = _to8Bit(pixel.b.toDouble() * rgbScale);
+      final a = _to8Bit(pixel.a.toDouble() * alphaScale);
+
+      if (a >= 255) return [r, g, b];
+      final opacity = a / 255.0;
+      return [
+        _to8Bit(r * opacity + 255 * (1 - opacity)),
+        _to8Bit(g * opacity + 255 * (1 - opacity)),
+        _to8Bit(b * opacity + 255 * (1 - opacity)),
+      ];
+    }
+
+    // The intended form is light paper with dark printed lines. If the compact
+    // palette was decoded backwards, flip it after alpha compositing.
     var lightSamples = 0;
     var darkSamples = 0;
-    for (var y = 0; y < decoded.height; y += 12) {
-      for (var x = 0; x < decoded.width; x += 12) {
-        final p = decoded.getPixel(x, y);
-        final luminance =
-            (p.r.toDouble() + p.g.toDouble() + p.b.toDouble()) / 3 * scale;
+    for (var y = 0; y < decoded.height; y += 8) {
+      for (var x = 0; x < decoded.width; x += 8) {
+        final rgb = compositePixel(decoded.getPixel(x, y));
+        final luminance = (rgb[0] + rgb[1] + rgb[2]) / 3;
         if (luminance >= 128) {
           lightSamples++;
         } else {
@@ -85,10 +105,10 @@ abstract final class PrescriptionTemplateImage {
     );
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
-        final pixel = decoded.getPixel(x, y);
-        var r = _to8Bit(pixel.r.toDouble() * scale);
-        var g = _to8Bit(pixel.g.toDouble() * scale);
-        var b = _to8Bit(pixel.b.toDouble() * scale);
+        final rgb = compositePixel(decoded.getPixel(x, y));
+        var r = rgb[0];
+        var g = rgb[1];
+        var b = rgb[2];
         if (invert) {
           r = 255 - r;
           g = 255 - g;
@@ -101,6 +121,14 @@ abstract final class PrescriptionTemplateImage {
     final result = Uint8List.fromList(img.encodePng(normalized, level: 6));
     _cache = result;
     return result;
+  }
+
+  static double _rangeScale(double maxValue) {
+    if (maxValue <= 1.5) return 255.0;
+    if (maxValue <= 15.5) return 17.0;
+    if (maxValue <= 31.5) return 255.0 / 31.0;
+    if (maxValue <= 63.5) return 255.0 / 63.0;
+    return 1.0;
   }
 
   static int _to8Bit(double value) => value.round().clamp(0, 255).toInt();
