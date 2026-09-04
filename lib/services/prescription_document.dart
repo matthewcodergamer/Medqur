@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../generated/prescription_template_data.dart';
 import '../models.dart';
+import 'prescription_template_image.dart';
 import 'signature_vault.dart';
 
 class PrescriptionPrintData {
@@ -71,11 +71,12 @@ abstract final class PrescriptionTemplateLayout {
 abstract final class PrescriptionDocumentService {
   static Future<Uint8List> build(PrescriptionPrintData data) async {
     final document = pw.Document();
-    final template = pw.MemoryImage(prescriptionTemplatePngBytes());
+    final template = pw.MemoryImage(PrescriptionTemplateImage.bytes());
     final signature = pw.MemoryImage(data.signature.imageBytes);
     final pageWidth = 148 * PdfPageFormat.mm;
-    final pageHeight =
-        pageWidth * (PrescriptionTemplateLayout.imageHeight / PrescriptionTemplateLayout.imageWidth);
+    final pageHeight = pageWidth *
+        (PrescriptionTemplateLayout.imageHeight /
+            PrescriptionTemplateLayout.imageWidth);
     final format = PdfPageFormat(pageWidth, pageHeight, marginAll: 0);
     final ink = data.ink == PrescriptionInk.blue
         ? const PdfColor(0.082, 0.29, 0.65)
