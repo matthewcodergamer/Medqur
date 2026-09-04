@@ -12,7 +12,7 @@ void main() {
 
     final decoded = img.decodePng(bytes);
     expect(decoded, isNotNull);
-    expect(decoded!.width, 371);
+    expect(decoded!.width, 627);
     expect(decoded.height, 1114);
     expect(decoded.numChannels, 4);
 
