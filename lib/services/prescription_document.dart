@@ -72,7 +72,7 @@ abstract final class PrescriptionTemplateLayout {
 abstract final class PrescriptionDocumentService {
   static Future<Uint8List> build(PrescriptionPrintData data) async {
     final document = pw.Document();
-    final template = pw.MemoryImage(PrescriptionTemplateImage.bytes());
+    final template = pw.MemoryImage(await PrescriptionTemplateImage.bytes());
     final safeSignature = SignatureRendering.onWhitePaper(data.signature.imageBytes);
     if (!SignatureRendering.looksLikeSignature(safeSignature)) {
       throw const FormatException(
