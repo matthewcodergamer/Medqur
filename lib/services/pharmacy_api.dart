@@ -222,8 +222,7 @@ class PharmacyApiClient {
         if (productId != null) 'productId': productId,
         if (gtin != null) 'gtin': gtin,
         'lotNumber': lotNumber,
-        if (manufactureDate != null)
-          'manufactureDate': manufactureDate.toIso8601String(),
+        if (manufactureDate != null) 'manufactureDate': manufactureDate.toIso8601String(),
         if (expiryDate != null) 'expiryDate': expiryDate.toIso8601String(),
         'serialNumber': serialNumber,
         'supplier': supplier,
@@ -301,6 +300,10 @@ class PharmacyApiClient {
     DateTime? dueAt,
     int earlyGraceMinutes = 30,
     int lateGraceMinutes = 60,
+    String? signaturePayload,
+    String? signatureSha256,
+    DateTime? signatureSignedAt,
+    String? signatureMethod,
   }) async {
     _requireConfigured();
     final response = await _client.post(
@@ -318,6 +321,10 @@ class PharmacyApiClient {
         if (dueAt != null) 'dueAt': dueAt.toIso8601String(),
         'earlyGraceMinutes': earlyGraceMinutes,
         'lateGraceMinutes': lateGraceMinutes,
+        if (signaturePayload != null) 'signaturePayload': signaturePayload,
+        if (signatureSha256 != null) 'signatureSha256': signatureSha256,
+        if (signatureSignedAt != null) 'signatureSignedAt': signatureSignedAt.toIso8601String(),
+        if (signatureMethod != null) 'signatureMethod': signatureMethod,
       }),
     );
     return _decode(response);
@@ -396,10 +403,7 @@ class PharmacyApiClient {
     required String role,
   }) async* {
     _requireConfigured();
-    final request = http.Request(
-      'GET',
-      _uri('v1/events', {'facilityId': facilityId}),
-    );
+    final request = http.Request('GET', _uri('v1/events', {'facilityId': facilityId}));
     request.headers.addAll(
       await _headers(staffId: staffId, role: role, facilityId: facilityId),
     );
