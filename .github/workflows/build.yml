@@ -37,14 +37,35 @@ jobs:
 
       - name: Start PostgreSQL and apply clinical schemas
         working-directory: backend
+        shell: bash
         run: |
+          set -euo pipefail
           docker compose up -d postgres
+
+          ready=false
           for i in {1..30}; do
             if docker compose exec -T postgres pg_isready -U medqur -d medqur; then
+              ready=true
               break
             fi
             sleep 2
           done
+          if [ "$ready" != true ]; then
+            docker compose logs postgres
+            echo "PostgreSQL did not become ready in time." >&2
+            exit 1
+          fi
+
+          # Do not depend on docker-entrypoint-initdb.d having run every file.
+          # Explicitly replay the ordered, idempotent Medqur schemas so CI sees
+          # the same complete clinical database on every fresh runner.
+          for migration in sql/*.sql; do
+            echo "Applying $migration"
+            docker compose exec -T postgres \
+              psql -U medqur -d medqur -v ON_ERROR_STOP=1 \
+              < "$migration"
+          done
+
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT count(*) AS medqur_tables FROM information_schema.tables WHERE table_schema='public';"
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT facility_id, code, name FROM inventory_locations;"
           docker compose exec -T postgres psql -U medqur -d medqur -v ON_ERROR_STOP=1 -c "SELECT generic_name, brand_name, approval_status FROM medication_products ORDER BY generic_name;"
@@ -329,7 +350,7 @@ jobs:
           - **Medqur-Android.apk** — Android release APK.
           - **Medqur-iOS-Unsigned.zip** — unsigned iOS `Runner.app` package. It is not an App Store/TestFlight-signed IPA and cannot be installed normally on an iPhone until it is code-signed.
 
-          V0.10 adds unique six-digit health-worker IDs and cryptographically signed/revocable staff QR credentials alongside the medication-master/pharmacy foundation and real-package scanning. Production clinical use still requires approved medication/formulary data, production OIDC/passkey infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
+          V0.11.4 bundles the browser-safe MRH prescription form, hardens prescription signature rendering, keeps the iPhone browser viewport at 1:1 scale, and requires biometric-only native staff unlock where Face ID, Touch ID, fingerprint, or supported face authentication is enrolled. Production clinical use still requires approved medication/formulary data, production OIDC/passkey infrastructure, approved clinical knowledge sources, Ministry/vendor integration access, security validation and signed deployment configuration.
           EOF
 
       - name: Replace latest GitHub Release
