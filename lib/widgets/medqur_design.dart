@@ -8,13 +8,17 @@ import 'common.dart';
 abstract final class MedqurLayout {
   static const compact = 600.0;
   static const medium = 1000.0;
-  static const contentMax = 1180.0;
+  static const contentMax = 1120.0;
 
   static EdgeInsets pagePadding(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    if (width < compact) return const EdgeInsets.fromLTRB(16, 18, 16, 28);
-    if (width < medium) return const EdgeInsets.fromLTRB(24, 22, 24, 34);
-    return const EdgeInsets.fromLTRB(32, 28, 32, 42);
+    if (width < compact) {
+      return const EdgeInsets.fromLTRB(14, 16, 14, 24);
+    }
+    if (width < medium) {
+      return const EdgeInsets.fromLTRB(22, 20, 22, 30);
+    }
+    return const EdgeInsets.fromLTRB(30, 26, 30, 38);
   }
 }
 
@@ -74,29 +78,30 @@ class MedqurPageHeader extends StatelessWidget {
                 Text(
                   eyebrow!.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xFF7A8798),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: .65,
+                    color: Color(0xFF7B8796),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .55,
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
               ],
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: compact ? 26 : 30,
-                      letterSpacing: -.7,
-                      fontWeight: FontWeight.w800,
+                      fontSize: compact ? 23 : 27,
+                      letterSpacing: -.5,
+                      fontWeight: FontWeight.w700,
                     ),
               ),
               if (subtitle != null) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 Text(
                   subtitle!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF647286),
-                        height: 1.35,
+                        color: const Color(0xFF69778A),
+                        fontSize: compact ? 12.5 : 13,
+                        height: 1.34,
                       ),
                 ),
               ],
@@ -104,7 +109,7 @@ class MedqurPageHeader extends StatelessWidget {
           ),
         ),
         if (trailing != null) ...[
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           trailing!,
         ],
       ],
@@ -134,35 +139,28 @@ class MedqurActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(15),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(color: medqurLine),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0910233F),
-                blurRadius: 18,
-                offset: Offset(0, 7),
-              ),
-            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(13),
+                  color: accent.withValues(alpha: .075),
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(icon, color: accent, size: 22),
+                child: Icon(icon, color: accent, size: 20),
               ),
-              const SizedBox(width: 13),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,46 +172,53 @@ class MedqurActionCard extends StatelessWidget {
                             title,
                             style: const TextStyle(
                               color: medqurInk,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -.15,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -.1,
                             ),
                           ),
                         ),
                         if (badge != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: accent.withValues(alpha: .09),
+                              color: accent.withValues(alpha: .08),
                               borderRadius: BorderRadius.circular(99),
                             ),
                             child: Text(
                               badge!,
                               style: TextStyle(
                                 color: accent,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Color(0xFF718095),
-                        fontSize: 12.5,
-                        height: 1.3,
+                        color: Color(0xFF748094),
+                        fontSize: 11.8,
+                        height: 1.28,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A3B2)),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF9AA4B1),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -236,10 +241,10 @@ class MedqurMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: medqurLine),
         ),
         child: Column(
@@ -249,17 +254,17 @@ class MedqurMetric extends StatelessWidget {
               value,
               style: TextStyle(
                 color: color,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.6,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.4,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF718095),
-                fontSize: 11.5,
+                color: Color(0xFF748094),
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -274,74 +279,97 @@ class PatientContextBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allergy = patient.allergies.isEmpty ? 'No known allergies recorded' : patient.allergies.join(', ');
+    final allergy = patient.allergies.isEmpty
+        ? 'No known allergies recorded'
+        : patient.allergies.join(', ');
     final color = triageColor(patient.triage);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: medqurLine),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 38,
+            height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(13),
+              color: color.withValues(alpha: .09),
+              borderRadius: BorderRadius.circular(11),
             ),
             child: Text(
               triageCode(patient.triage),
-              style: TextStyle(color: color, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   patient.name,
-                  style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 15),
+                  style: const TextStyle(
+                    color: medqurInk,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${patient.age} • ${patient.sex} • ${patient.id}',
-                  style: const TextStyle(color: Color(0xFF718095), fontSize: 11.5),
+                  style: const TextStyle(
+                    color: Color(0xFF748094),
+                    fontSize: 11,
+                  ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Text(
                   'Allergies: $allergy',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: patient.allergies.isEmpty ? const Color(0xFF718095) : medqurRed,
-                    fontSize: 11.5,
-                    fontWeight: patient.allergies.isEmpty ? FontWeight.w500 : FontWeight.w700,
+                    color: patient.allergies.isEmpty
+                        ? const Color(0xFF748094)
+                        : medqurRed,
+                    fontSize: 11,
+                    fontWeight: patient.allergies.isEmpty
+                        ? FontWeight.w500
+                        : FontWeight.w700,
                   ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.lock_outline_rounded, size: 17, color: Color(0xFF98A3B2)),
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: Color(0xFF9AA4B1),
+          ),
         ],
       ),
     );
   }
 }
 
+/// A restrained medication motif for low-risk browsing surfaces only.
+/// It should not be used on prescribing confirmation or administration screens.
 class CapsuleIllustration extends StatelessWidget {
-  const CapsuleIllustration({super.key, this.width = 142});
+  const CapsuleIllustration({super.key, this.width = 132});
   final double width;
 
   @override
   Widget build(BuildContext context) => SizedBox(
         width: width,
-        height: width * .62,
+        height: width * .54,
         child: CustomPaint(painter: _CapsulePainter()),
       );
 }
@@ -350,43 +378,50 @@ class _CapsulePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.translate(size.width * .12, size.height * .12);
-    canvas.rotate(-math.pi / 13);
-    final rect = Rect.fromLTWH(0, 0, size.width * .76, size.height * .48);
-    final radius = Radius.circular(rect.height / 2);
-    final clip = RRect.fromRectAndRadius(rect, radius);
-    canvas.clipRRect(clip);
+    canvas.translate(size.width * .14, size.height * .12);
+    canvas.rotate(-math.pi / 15);
+
+    final shadowRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        3,
+        4,
+        size.width * .70,
+        size.height * .40,
+      ),
+      Radius.circular(size.height * .20),
+    );
+    canvas.drawRRect(
+      shadowRect,
+      Paint()
+        ..color = const Color(0x1210243F)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+
+    final rect = Rect.fromLTWH(
+      0,
+      0,
+      size.width * .70,
+      size.height * .40,
+    );
+    final capsule = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(rect.height / 2),
+    );
+    canvas.clipRRect(capsule);
     canvas.drawRect(
       Rect.fromLTWH(0, 0, rect.width * .5, rect.height),
-      Paint()..color = medqurBlue,
+      Paint()..color = const Color(0xFF2E6EDC),
     );
     canvas.drawRect(
       Rect.fromLTWH(rect.width * .5, 0, rect.width * .5, rect.height),
-      Paint()..color = Colors.white,
+      Paint()..color = const Color(0xFFFDFEFE),
     );
     canvas.drawLine(
-      Offset(rect.width * .5, 2),
-      Offset(rect.width * .5, rect.height - 2),
+      Offset(rect.width * .5, 1),
+      Offset(rect.width * .5, rect.height - 1),
       Paint()
-        ..color = const Color(0xFFDCE5F2)
-        ..strokeWidth = 1.4,
-    );
-    canvas.restore();
-
-    final borderRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * .12, size.height * .12, size.width * .76, size.height * .48),
-      Radius.circular(size.height * .24),
-    );
-    canvas.save();
-    canvas.translate(borderRect.left, borderRect.top);
-    canvas.rotate(-math.pi / 13);
-    canvas.translate(-borderRect.left, -borderRect.top);
-    canvas.drawRRect(
-      borderRect,
-      Paint()
-        ..color = const Color(0x180F274A)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
+        ..color = const Color(0xFFD8E0EA)
+        ..strokeWidth = 1,
     );
     canvas.restore();
   }
