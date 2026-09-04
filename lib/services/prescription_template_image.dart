@@ -8,12 +8,12 @@ import '../generated/prescription_template_data.dart'
 
 /// Returns the embedded SRHA/MRH prescription form as a conventional RGBA PNG.
 ///
-/// The compact source is line-wrapped base64 and uses a very small monochrome
-/// PNG representation. Depending on the decoder, that source may expose its
-/// paper/ink information through 1-bit RGB values, an alpha mask, or an indexed
-/// palette. This normalizer converts all of those cases to an ordinary black-on-
-/// white 8-bit RGBA image so Flutter web, native Flutter and the PDF renderer see
-/// the same prescription form instead of a grey/black placeholder.
+/// The source is an aggressively compact 1-bit PNG. Different PNG decoders can
+/// expose that monochrome form as RGB, as an alpha mask, or as RGB plus a
+/// transparency key. A naive alpha composite can therefore erase every printed
+/// line and leave a completely white page. This normalizer evaluates the
+/// plausible monochrome interpretations and chooses the one that actually looks
+/// like white prescription paper containing sparse dark printed ink.
 abstract final class PrescriptionTemplateImage {
   static Uint8List? _cache;
 
@@ -34,13 +34,7 @@ abstract final class PrescriptionTemplateImage {
     }
 
     var rgbMax = 0.0;
-    var alphaMin = double.infinity;
     var alphaMax = 0.0;
-
-    // Inspect every pixel here. The prescription form contains very thin
-    // one-pixel/low-bit printed strokes, and a coarse sampling grid can land
-    // entirely on white paper and incorrectly conclude that the alpha channel
-    // is constant. That was enough to turn the full form white after inversion.
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
         final p = decoded.getPixel(x, y);
@@ -50,58 +44,45 @@ abstract final class PrescriptionTemplateImage {
           p.g.toDouble(),
           p.b.toDouble(),
         );
-        final alpha = p.a.toDouble();
-        if (alpha < alphaMin) alphaMin = alpha;
-        if (alpha > alphaMax) alphaMax = alpha;
+        if (p.a.toDouble() > alphaMax) alphaMax = p.a.toDouble();
       }
     }
 
     final rgbScale = _rangeScale(rgbMax);
     final alphaScale = _rangeScale(alphaMax);
 
-    // Some ultra-compact monochrome PNGs store a solid black RGB value and use
-    // alpha only as the ink mask. In that case a direct RGB copy produces one
-    // giant black rectangle. Treat transparent/low-alpha pixels as white paper
-    // and opaque/high-alpha pixels as black ink instead.
-    final alphaCarriesInk = rgbMax <= 0.5 && alphaMax > alphaMin;
-
-    List<int> compositePixel(img.Pixel pixel) {
-      if (alphaCarriesInk) {
-        final alpha = _to8Bit(pixel.a.toDouble() * alphaScale);
-        final paper = 255 - alpha;
-        return [paper, paper, paper];
-      }
-
-      final r = _to8Bit(pixel.r.toDouble() * rgbScale);
-      final g = _to8Bit(pixel.g.toDouble() * rgbScale);
-      final b = _to8Bit(pixel.b.toDouble() * rgbScale);
-      final a = _to8Bit(pixel.a.toDouble() * alphaScale);
-
-      if (a >= 255) return [r, g, b];
-      final opacity = a / 255.0;
-      return [
-        _to8Bit(r * opacity + 255 * (1 - opacity)),
-        _to8Bit(g * opacity + 255 * (1 - opacity)),
-        _to8Bit(b * opacity + 255 * (1 - opacity)),
-      ];
+    final candidates = <_TemplateCandidate>[];
+    for (final mode in _TemplateMode.values) {
+      candidates.add(
+        _analyse(
+          decoded,
+          mode: mode,
+          invert: false,
+          rgbScale: rgbScale,
+          alphaScale: alphaScale,
+        ),
+      );
+      candidates.add(
+        _analyse(
+          decoded,
+          mode: mode,
+          invert: true,
+          rgbScale: rgbScale,
+          alphaScale: alphaScale,
+        ),
+      );
     }
+    candidates.sort((a, b) => b.score.compareTo(a.score));
+    final selected = candidates.first;
 
-    // The intended form is light paper with dark printed lines. If the compact
-    // palette was decoded backwards, flip it after alpha compositing.
-    var lightSamples = 0;
-    var darkSamples = 0;
-    for (var y = 0; y < decoded.height; y += 8) {
-      for (var x = 0; x < decoded.width; x += 8) {
-        final rgb = compositePixel(decoded.getPixel(x, y));
-        final luminance = (rgb[0] + rgb[1] + rgb[2]) / 3;
-        if (luminance >= 128) {
-          lightSamples++;
-        } else {
-          darkSamples++;
-        }
-      }
+    // Never silently publish another empty/solid placeholder. If none of the
+    // decoder interpretations contains both light paper and printed structure,
+    // fail loudly so CI catches the form asset before it reaches clinicians.
+    if (!selected.plausible) {
+      throw const FormatException(
+        'The embedded prescription form decoded without usable printed content.',
+      );
     }
-    final invert = darkSamples > lightSamples;
 
     final normalized = img.Image(
       width: decoded.width,
@@ -110,22 +91,129 @@ abstract final class PrescriptionTemplateImage {
     );
     for (var y = 0; y < decoded.height; y++) {
       for (var x = 0; x < decoded.width; x++) {
-        final rgb = compositePixel(decoded.getPixel(x, y));
-        var r = rgb[0];
-        var g = rgb[1];
-        var b = rgb[2];
-        if (invert) {
-          r = 255 - r;
-          g = 255 - g;
-          b = 255 - b;
-        }
-        normalized.setPixelRgba(x, y, r, g, b, 255);
+        final rgb = _pixel(
+          decoded.getPixel(x, y),
+          mode: selected.mode,
+          invert: selected.invert,
+          rgbScale: rgbScale,
+          alphaScale: alphaScale,
+        );
+        normalized.setPixelRgba(x, y, rgb.$1, rgb.$2, rgb.$3, 255);
       }
     }
 
     final result = Uint8List.fromList(img.encodePng(normalized, level: 6));
     _cache = result;
     return result;
+  }
+
+  static _TemplateCandidate _analyse(
+    img.Image decoded, {
+    required _TemplateMode mode,
+    required bool invert,
+    required double rgbScale,
+    required double alphaScale,
+  }) {
+    var light = 0;
+    var nonWhite = 0;
+    var dark = 0;
+    var minLuminance = 255.0;
+    var maxLuminance = 0.0;
+    final total = decoded.width * decoded.height;
+
+    // Inspect all pixels. Printed rules and small type in this form can be only
+    // one pixel thick; coarse sampling was the reason earlier validation missed
+    // the real form content.
+    for (var y = 0; y < decoded.height; y++) {
+      for (var x = 0; x < decoded.width; x++) {
+        final rgb = _pixel(
+          decoded.getPixel(x, y),
+          mode: mode,
+          invert: invert,
+          rgbScale: rgbScale,
+          alphaScale: alphaScale,
+        );
+        final luminance = .299 * rgb.$1 + .587 * rgb.$2 + .114 * rgb.$3;
+        if (luminance > 245) light++;
+        if (luminance < 250) nonWhite++;
+        if (luminance < 180) dark++;
+        if (luminance < minLuminance) minLuminance = luminance;
+        if (luminance > maxLuminance) maxLuminance = luminance;
+      }
+    }
+
+    final lightRatio = light / total;
+    final nonWhiteRatio = nonWhite / total;
+    final darkRatio = dark / total;
+    final contrast = maxLuminance - minLuminance;
+    final plausible = lightRatio > .45 &&
+        nonWhiteRatio > .001 &&
+        nonWhiteRatio < .50 &&
+        darkRatio > .0005 &&
+        contrast > 12;
+
+    // Prescription paper should be mostly light, with a meaningful but sparse
+    // amount of dark typography/rules and strong tonal contrast. The score makes
+    // an all-white or all-black candidate lose to the real form interpretation.
+    var score = lightRatio * 3.0;
+    score += (nonWhiteRatio * 25).clamp(0.0, 1.5);
+    score += (darkRatio * 45).clamp(0.0, 1.2);
+    score += (contrast / 255).clamp(0.0, 1.0);
+    if (nonWhiteRatio > .38) score -= (nonWhiteRatio - .38) * 8;
+    if (nonWhiteRatio <= .001 || contrast <= 12) score -= 3;
+
+    return _TemplateCandidate(
+      mode: mode,
+      invert: invert,
+      score: score,
+      plausible: plausible,
+    );
+  }
+
+  static (int, int, int) _pixel(
+    img.Pixel pixel, {
+    required _TemplateMode mode,
+    required bool invert,
+    required double rgbScale,
+    required double alphaScale,
+  }) {
+    final rawR = _to8Bit(pixel.r.toDouble() * rgbScale);
+    final rawG = _to8Bit(pixel.g.toDouble() * rgbScale);
+    final rawB = _to8Bit(pixel.b.toDouble() * rgbScale);
+    final alpha = _to8Bit(pixel.a.toDouble() * alphaScale);
+
+    int r;
+    int g;
+    int b;
+    switch (mode) {
+      case _TemplateMode.rgbIgnoringAlpha:
+        // Critical fallback for 1-bit PNGs where the black form strokes carry
+        // a transparency key. Compositing those pixels first would erase them.
+        r = rawR;
+        g = rawG;
+        b = rawB;
+      case _TemplateMode.rgbComposite:
+        final opacity = alpha / 255.0;
+        r = _to8Bit(rawR * opacity + 255 * (1 - opacity));
+        g = _to8Bit(rawG * opacity + 255 * (1 - opacity));
+        b = _to8Bit(rawB * opacity + 255 * (1 - opacity));
+      case _TemplateMode.alphaHighIsInk:
+        final value = 255 - alpha;
+        r = value;
+        g = value;
+        b = value;
+      case _TemplateMode.alphaLowIsInk:
+        r = alpha;
+        g = alpha;
+        b = alpha;
+    }
+
+    if (invert) {
+      r = 255 - r;
+      g = 255 - g;
+      b = 255 - b;
+    }
+    return (r, g, b);
   }
 
   static double _rangeScale(double maxValue) {
@@ -145,4 +233,25 @@ abstract final class PrescriptionTemplateImage {
     if (d > result) result = d;
     return result;
   }
+}
+
+enum _TemplateMode {
+  rgbIgnoringAlpha,
+  rgbComposite,
+  alphaHighIsInk,
+  alphaLowIsInk,
+}
+
+class _TemplateCandidate {
+  const _TemplateCandidate({
+    required this.mode,
+    required this.invert,
+    required this.score,
+    required this.plausible,
+  });
+
+  final _TemplateMode mode;
+  final bool invert;
+  final double score;
+  final bool plausible;
 }
