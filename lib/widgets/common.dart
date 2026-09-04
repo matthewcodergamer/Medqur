@@ -3,14 +3,14 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../app_assets.dart';
 import '../models.dart';
 
-const medqurBlue = Color(0xFF3474E6);
-const medqurNavy = Color(0xFF173F8A);
-const medqurInk = Color(0xFF10233F);
-const medqurSurface = Color(0xFFF5F8FC);
-const medqurLine = Color(0xFFE3EAF3);
-const medqurGreen = Color(0xFF0F9D73);
-const medqurAmber = Color(0xFFF4A51C);
-const medqurRed = Color(0xFFD83A4D);
+const medqurBlue = Color(0xFF2F67C7);
+const medqurNavy = Color(0xFF183B67);
+const medqurInk = Color(0xFF17283A);
+const medqurSurface = Color(0xFFF7F8FA);
+const medqurLine = Color(0xFFE4E7EB);
+const medqurGreen = Color(0xFF167A59);
+const medqurAmber = Color(0xFFC98516);
+const medqurRed = Color(0xFFC83B4B);
 
 /// Browser-safe vector wordmark. It intentionally does not use the old raster
 /// wordmark, which carried a baked grey background on some browsers.
@@ -151,7 +151,7 @@ class SoftCard extends StatelessWidget {
   const SoftCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(16),
     this.onTap,
     this.highlighted = false,
   });
@@ -163,24 +163,25 @@ class SoftCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(16);
     final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: radius,
         border: Border.all(
           color: highlighted
-              ? medqurBlue.withValues(alpha: .55)
+              ? medqurBlue.withValues(alpha: .45)
               : medqurLine,
-          width: highlighted ? 1.5 : 1,
+          width: highlighted ? 1.25 : 1,
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0A173F8A),
-            blurRadius: 22,
-            offset: Offset(0, 8),
+            color: Color(0x07000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -190,7 +191,7 @@ class SoftCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: radius,
         onTap: onTap,
         child: card,
       ),
@@ -210,7 +211,7 @@ class SectionTitle extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: medqurInk,
                   ),
             ),
@@ -234,24 +235,25 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: .10),
+          color: color.withValues(alpha: .065),
           borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: .12)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 5),
+              Icon(icon, size: 12.5, color: color),
+              const SizedBox(width: 4),
             ],
             Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -264,7 +266,7 @@ class StatusPill extends StatelessWidget {
 /// P1-P4 emergency-priority terminology.
 Color triageColor(TriageLevel level) => switch (level) {
       TriageLevel.critical => medqurRed,
-      TriageLevel.urgent => const Color(0xFFE46A25),
+      TriageLevel.urgent => const Color(0xFFD66B2C),
       TriageLevel.moderate => medqurAmber,
       TriageLevel.routine => medqurGreen,
     };
@@ -332,19 +334,19 @@ class FadeSlideIn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
-        duration: Duration(milliseconds: 360 + delay.inMilliseconds),
+        duration: Duration(milliseconds: 260 + delay.inMilliseconds),
         curve: Curves.easeOutCubic,
         builder: (context, value, _) {
           final delayed = delay.inMilliseconds == 0
               ? value
-              : ((value * (360 + delay.inMilliseconds) -
+              : ((value * (260 + delay.inMilliseconds) -
                           delay.inMilliseconds) /
-                      360)
+                      260)
                   .clamp(0.0, 1.0);
           return Opacity(
             opacity: delayed,
             child: Transform.translate(
-              offset: Offset(0, 9 * (1 - delayed)),
+              offset: Offset(0, 6 * (1 - delayed)),
               child: child,
             ),
           );
