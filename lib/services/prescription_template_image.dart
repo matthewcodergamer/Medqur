@@ -36,8 +36,13 @@ abstract final class PrescriptionTemplateImage {
     var rgbMax = 0.0;
     var alphaMin = double.infinity;
     var alphaMax = 0.0;
-    for (var y = 0; y < decoded.height; y += 8) {
-      for (var x = 0; x < decoded.width; x += 8) {
+
+    // Inspect every pixel here. The prescription form contains very thin
+    // one-pixel/low-bit printed strokes, and a coarse sampling grid can land
+    // entirely on white paper and incorrectly conclude that the alpha channel
+    // is constant. That was enough to turn the full form white after inversion.
+    for (var y = 0; y < decoded.height; y++) {
+      for (var x = 0; x < decoded.width; x++) {
         final p = decoded.getPixel(x, y);
         rgbMax = _max4(
           rgbMax,
