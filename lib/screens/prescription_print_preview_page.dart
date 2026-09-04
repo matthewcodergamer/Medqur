@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../services/prescription_document.dart';
+import '../services/signature_vault.dart';
 import '../widgets/common.dart';
 import '../widgets/prescription_form_preview.dart';
 
