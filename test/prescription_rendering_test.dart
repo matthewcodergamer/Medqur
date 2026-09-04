@@ -1,62 +1,13 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:medqur/generated/prescription_template_data.dart'
-    show kPrescriptionTemplatePngBase64;
 import 'package:medqur/services/prescription_template_image.dart';
 import 'package:medqur/services/signature_rendering.dart';
 import 'package:medqur/services/signature_vault.dart';
 
 void main() {
   test('MRH prescription template normalizes to a renderable RGBA PNG', () {
-    final sourceBytes = base64Decode(
-      kPrescriptionTemplatePngBase64.replaceAll(RegExp(r'\s+'), ''),
-    );
-    final source = img.decodeImage(sourceBytes);
-    expect(source, isNotNull);
-
-    var minR = double.infinity;
-    var maxR = double.negativeInfinity;
-    var minG = double.infinity;
-    var maxG = double.negativeInfinity;
-    var minB = double.infinity;
-    var maxB = double.negativeInfinity;
-    var minA = double.infinity;
-    var maxA = double.negativeInfinity;
-    var rChanges = 0;
-    var aChanges = 0;
-    final first = source!.getPixel(0, 0);
-    for (var y = 0; y < source.height; y++) {
-      for (var x = 0; x < source.width; x++) {
-        final p = source.getPixel(x, y);
-        final r = p.r.toDouble();
-        final g = p.g.toDouble();
-        final b = p.b.toDouble();
-        final a = p.a.toDouble();
-        if (r < minR) minR = r;
-        if (r > maxR) maxR = r;
-        if (g < minG) minG = g;
-        if (g > maxG) maxG = g;
-        if (b < minB) minB = b;
-        if (b > maxB) maxB = b;
-        if (a < minA) minA = a;
-        if (a > maxA) maxA = a;
-        if (p.r != first.r) rChanges++;
-        if (p.a != first.a) aChanges++;
-      }
-    }
-    // Keep this print while stabilizing the historical 1-bit asset. It makes a
-    // future decoder regression diagnosable from CI without shipping the image.
-    // ignore: avoid_print
-    print(
-      'MRH_RAW channels=${source.numChannels} '
-      'r=$minR..$maxR g=$minG..$maxG b=$minB..$maxB '
-      'a=$minA..$maxA rChanges=$rChanges aChanges=$aChanges '
-      'bytes=${sourceBytes.length}',
-    );
-
     final bytes = PrescriptionTemplateImage.bytes();
     expect(bytes, isNotEmpty);
 
