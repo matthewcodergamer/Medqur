@@ -31,7 +31,9 @@ MOBILE_WEB_STYLE = """  <style id="medqur-mobile-web">
     html,
     body {
       width: 100%;
+      max-width: 100vw;
       height: 100%;
+      min-height: 100%;
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -52,6 +54,16 @@ MOBILE_WEB_STYLE = """  <style id="medqur-mobile-web">
       background: #F8F9FA;
     }
 
+    /* Do not let Flutter's host element inherit a stale Safari visual viewport
+       after the keyboard closes or the phone rotates. */
+    flutter-view,
+    flt-glass-pane {
+      width: 100% !important;
+      max-width: 100vw !important;
+      height: 100% !important;
+      max-height: 100dvh !important;
+    }
+
     /* iOS Safari auto-zooms focused form controls below 16px. Flutter uses
        DOM text-editing controls underneath its rendered fields, so keep those
        controls at the Safari-safe size without changing the visual Dart theme. */
@@ -67,9 +79,80 @@ MOBILE_WEB_STYLE = """  <style id="medqur-mobile-web">
       html,
       body {
         height: 100dvh;
+        min-height: 100dvh;
       }
     }
   </style>"""
+
+MOBILE_WEB_SCRIPT = """  <script id="medqur-ios-zoom-guard">
+    (() => {
+      const viewport = document.querySelector('meta[name="viewport"]');
+      const viewportValue = 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
+      const resetViewport = () => {
+        if (viewport && viewport.getAttribute('content') !== viewportValue) {
+          viewport.setAttribute('content', viewportValue);
+        }
+        document.documentElement.style.zoom = '1';
+        if (document.body) document.body.style.zoom = '1';
+      };
+
+      const normalizeEditors = (root) => {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll('input, textarea, select').forEach((editor) => {
+          editor.style.fontSize = '16px';
+        });
+      };
+
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.matches?.('input, textarea, select')) {
+                node.style.fontSize = '16px';
+              }
+              normalizeEditors(node);
+            }
+          }
+        }
+      });
+
+      const start = () => {
+        resetViewport();
+        normalizeEditors(document);
+        observer.observe(document.documentElement, {childList: true, subtree: true});
+      };
+
+      document.addEventListener('focusin', (event) => {
+        const target = event.target;
+        if (target?.matches?.('input, textarea, select')) {
+          target.style.fontSize = '16px';
+          resetViewport();
+        }
+      }, true);
+
+      document.addEventListener('focusout', () => {
+        window.setTimeout(() => {
+          resetViewport();
+          window.scrollTo(0, 0);
+        }, 120);
+      }, true);
+
+      window.addEventListener('pageshow', resetViewport);
+      window.addEventListener('orientationchange', () => {
+        window.setTimeout(() => {
+          resetViewport();
+          window.scrollTo(0, 0);
+        }, 180);
+      });
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start, {once: true});
+      } else {
+        start();
+      }
+    })();
+  </script>"""
 
 
 def icon(size: int) -> Image.Image:
@@ -219,6 +302,15 @@ def _configure_mobile_web_shell(text: str) -> str:
     else:
         text = text.replace("</head>", MOBILE_WEB_STYLE + "\n</head>", 1)
 
+    script_pattern = re.compile(
+        r'\s*<script\s+id=["\']medqur-ios-zoom-guard["\']>.*?</script>',
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if script_pattern.search(text):
+        text = script_pattern.sub("\n" + MOBILE_WEB_SCRIPT, text, count=1)
+    else:
+        text = text.replace("</head>", MOBILE_WEB_SCRIPT + "\n</head>", 1)
+
     # Fail CI immediately if a future Flutter template change prevents the
     # iPhone viewport hardening from being written into the generated shell.
     required = (
@@ -227,8 +319,11 @@ def _configure_mobile_web_shell(text: str) -> str:
         'maximum-scale=1.0',
         'viewport-fit=cover',
         'medqur-mobile-web',
+        'medqur-ios-zoom-guard',
         '-webkit-text-size-adjust: 100%',
         'font-size: 16px !important',
+        'window.scrollTo(0, 0)',
+        'flt-glass-pane',
     )
     missing = [value for value in required if value not in text]
     if missing:
