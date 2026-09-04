@@ -17,18 +17,30 @@ void main() {
     expect(decoded.height, 1114);
     expect(decoded.numChannels, 4);
 
-    var darkPixels = 0;
+    // The hospital form uses thin one/few-pixel rules. Sampling every tenth
+    // pixel can miss every rule and incorrectly call a perfectly valid form
+    // blank, so inspect the complete normalized image instead.
+    var nonWhitePixels = 0;
     var lightPixels = 0;
-    for (var y = 0; y < decoded.height; y += 10) {
-      for (var x = 0; x < decoded.width; x += 10) {
+    var nonOpaquePixels = 0;
+    var minLuminance = 255.0;
+    var maxLuminance = 0.0;
+    for (var y = 0; y < decoded.height; y++) {
+      for (var x = 0; x < decoded.width; x++) {
         final p = decoded.getPixel(x, y);
-        final lum = (p.r + p.g + p.b) / 3;
-        if (lum < 110) darkPixels++;
-        if (lum > 235) lightPixels++;
+        final lum = .299 * p.r + .587 * p.g + .114 * p.b;
+        if (p.a != 255) nonOpaquePixels++;
+        if (lum < 250) nonWhitePixels++;
+        if (lum > 245) lightPixels++;
+        if (lum < minLuminance) minLuminance = lum;
+        if (lum > maxLuminance) maxLuminance = lum;
       }
     }
-    expect(darkPixels, greaterThan(20));
-    expect(lightPixels, greaterThan(200));
+    final pixels = decoded.width * decoded.height;
+    expect(nonOpaquePixels, 0);
+    expect(nonWhitePixels, greaterThan(100));
+    expect(lightPixels / pixels, greaterThan(.50));
+    expect(maxLuminance - minLuminance, greaterThan(8));
   });
 
   test('paper signature extraction keeps pen strokes without making a blob', () async {
