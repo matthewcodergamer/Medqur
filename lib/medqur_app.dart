@@ -74,50 +74,50 @@ class _MedqurAppState extends State<MedqurApp> {
     );
 
     return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFF7F8FA),
+      scaffoldBackgroundColor: const Color(0xFFF8F9FA),
       splashFactory: InkRipple.splashFactory,
       textTheme: base.textTheme.copyWith(
         displaySmall: const TextStyle(
           color: medqurInk,
-          fontSize: 30,
+          fontSize: 29,
           fontWeight: FontWeight.w700,
-          letterSpacing: -.8,
+          letterSpacing: -.72,
           height: 1.08,
         ),
         headlineSmall: const TextStyle(
           color: medqurInk,
-          fontSize: 24,
+          fontSize: 23,
           fontWeight: FontWeight.w700,
-          letterSpacing: -.55,
+          letterSpacing: -.48,
           height: 1.12,
         ),
         titleLarge: const TextStyle(
           color: medqurInk,
-          fontSize: 19,
+          fontSize: 18.5,
           fontWeight: FontWeight.w700,
-          letterSpacing: -.25,
+          letterSpacing: -.2,
         ),
         titleMedium: const TextStyle(
           color: medqurInk,
-          fontSize: 15,
+          fontSize: 14.75,
           fontWeight: FontWeight.w700,
         ),
         bodyLarge: const TextStyle(
-          color: Color(0xFF435166),
-          fontSize: 14.5,
+          color: Color(0xFF44515F),
+          fontSize: 14,
           fontWeight: FontWeight.w400,
           height: 1.38,
         ),
         bodyMedium: const TextStyle(
-          color: Color(0xFF5F6C7D),
-          fontSize: 13.5,
+          color: Color(0xFF626E7B),
+          fontSize: 13,
           fontWeight: FontWeight.w400,
           height: 1.38,
         ),
         labelLarge: const TextStyle(
-          fontSize: 13.5,
+          fontSize: 13,
           fontWeight: FontWeight.w700,
-          letterSpacing: -.04,
+          letterSpacing: -.02,
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -129,34 +129,34 @@ class _MedqurAppState extends State<MedqurApp> {
         centerTitle: false,
         titleTextStyle: TextStyle(
           color: medqurInk,
-          fontSize: 17,
+          fontSize: 16.5,
           fontWeight: FontWeight.w700,
-          letterSpacing: -.2,
+          letterSpacing: -.15,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 64,
+        height: 62,
         backgroundColor: Colors.white,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.white,
-        indicatorColor: const Color(0xFFEAF1FF),
+        indicatorColor: const Color(0xFFF0F3F6),
         indicatorShape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? medqurBlue
-                : const Color(0xFF687486),
-            size: 22,
+                ? medqurNavy
+                : const Color(0xFF737E8A),
+            size: 21,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             color: states.contains(WidgetState.selected)
                 ? medqurInk
-                : const Color(0xFF687486),
-            fontSize: 10,
+                : const Color(0xFF737E8A),
+            fontSize: 9.75,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w600,
@@ -165,28 +165,28 @@ class _MedqurAppState extends State<MedqurApp> {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFFFAFBFC),
+        fillColor: Colors.white,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         labelStyle:
-            const TextStyle(color: Color(0xFF6B788A), fontSize: 12.5),
+            const TextStyle(color: Color(0xFF6D7885), fontSize: 12.25),
         hintStyle:
-            const TextStyle(color: Color(0xFF9BA5B3), fontSize: 12.5),
-        prefixIconColor: const Color(0xFF677486),
+            const TextStyle(color: Color(0xFF9CA4AE), fontSize: 12.25),
+        prefixIconColor: const Color(0xFF707B88),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(11),
           borderSide: const BorderSide(color: medqurLine),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(11),
           borderSide: const BorderSide(color: medqurLine),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: medqurBlue, width: 1.35),
+          borderRadius: BorderRadius.circular(11),
+          borderSide: const BorderSide(color: medqurBlue, width: 1.25),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(11),
           borderSide: const BorderSide(color: medqurRed),
         ),
       ),
@@ -194,25 +194,26 @@ class _MedqurAppState extends State<MedqurApp> {
         style: FilledButton.styleFrom(
           backgroundColor: medqurBlue,
           foregroundColor: Colors.white,
-          minimumSize: const Size(0, 48),
+          minimumSize: const Size(0, 47),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(11),
           ),
           textStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: medqurNavy,
           minimumSize: const Size(0, 46),
-          side: const BorderSide(color: Color(0xFFCED6E1)),
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xFFD5DAE0)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(11),
           ),
           textStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.75),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -220,27 +221,27 @@ class _MedqurAppState extends State<MedqurApp> {
           foregroundColor: medqurBlue,
           textStyle: const TextStyle(
             fontWeight: FontWeight.w700,
-            fontSize: 12.5,
+            fontSize: 12.25,
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: Colors.white,
-        selectedColor: const Color(0xFFEAF1FF),
-        side: const BorderSide(color: Color(0xFFD9E0E9)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        selectedColor: const Color(0xFFF0F3F6),
+        side: const BorderSide(color: Color(0xFFDDE1E6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         labelStyle: const TextStyle(
           color: medqurInk,
-          fontSize: 11.5,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.white,
@@ -264,7 +265,7 @@ class _MedqurAppState extends State<MedqurApp> {
       debugShowCheckedModeBanner: false,
       theme: _theme(),
       home: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 190),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
         child: _buildStage(),
@@ -281,12 +282,12 @@ class _MedqurAppState extends State<MedqurApp> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                MedqurLogo(width: 156),
-                SizedBox(height: 16),
+                MedqurLogo(width: 148),
+                SizedBox(height: 15),
                 SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                  width: 19,
+                  height: 19,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ],
             ),
@@ -296,20 +297,20 @@ class _MedqurAppState extends State<MedqurApp> {
     }
     if (_staff == null) {
       return SignInScreen(
-        key: const ValueKey('signin-v4'),
+        key: const ValueKey('signin-v5'),
         onSignedIn: (staff) => setState(() => _staff = staff),
       );
     }
     if (_facility == null) {
       return FacilityScreen(
-        key: const ValueKey('facility-v4'),
+        key: const ValueKey('facility-v5'),
         staff: _staff!,
         onBack: () => setState(() => _staff = null),
         onStartShift: (facility) => setState(() => _facility = facility),
       );
     }
     return ClinicalShellV2(
-      key: const ValueKey('shell-v4'),
+      key: const ValueKey('shell-v5'),
       staff: _staff!,
       facility: _facility!,
       patients: _patients!,
