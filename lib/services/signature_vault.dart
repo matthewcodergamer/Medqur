@@ -346,8 +346,14 @@ abstract final class SignatureImageProcessor {
       var first = true;
       for (final rawPoint in rawStroke) {
         if (rawPoint is! List<dynamic> || rawPoint.length < 2) continue;
-        final x = (rawPoint[0] as num).toDouble().clamp(0, 1000);
-        final y = (rawPoint[1] as num).toDouble().clamp(0, 400);
+        final x = (rawPoint[0] as num)
+            .toDouble()
+            .clamp(0.0, 1000.0)
+            .toDouble();
+        final y = (rawPoint[1] as num)
+            .toDouble()
+            .clamp(0.0, 400.0)
+            .toDouble();
         if (first) {
           path.moveTo(x, y);
           first = false;
