@@ -8,6 +8,8 @@ import 'patient_queue_page.dart';
 import 'profile_page.dart';
 import 'scan_page.dart';
 
+/// Legacy shell retained for source compatibility with early V0.x routes.
+/// The production prototype now enters ClinicalShellV2 from medqur_app.dart.
 class ClinicalShell extends StatefulWidget {
   const ClinicalShell({
     super.key,
@@ -78,7 +80,14 @@ class _ClinicalShellState extends State<ClinicalShell> {
         );
       case 2:
         return isDoctor
-            ? OrdersPage(patients: widget.patients, onOpenPatient: openPatient)
+            ? OrdersPage(
+                staff: widget.staff,
+                patients: widget.patients,
+                onOpenPatient: openPatient,
+                onCreatePrescription: () {
+                  if (widget.patients.isNotEmpty) openPatient(widget.patients.first);
+                },
+              )
             : NurseTasksPage(patients: widget.patients, onOpenPatient: openPatient);
       default:
         return ProfilePage(
@@ -157,77 +166,53 @@ class _ClinicalShellState extends State<ClinicalShell> {
               ),
             ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: medqurSurface, borderRadius: BorderRadius.circular(18)),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: medqurBlue.withValues(alpha: .12),
-                  foregroundColor: medqurBlue,
-                  child: Text(widget.staff.name.split(' ').last[0]),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.staff.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: medqurInk),
-                      ),
-                      Text(widget.staff.title, style: const TextStyle(fontSize: 11, color: Color(0xFF748297))),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          Text(
+            widget.staff.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 12),
           ),
+          const SizedBox(height: 3),
+          Text(widget.staff.title, style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11)),
         ],
       ),
     );
   }
 
-  Widget _topBar(bool desktop) {
-    return Container(
-      height: 72,
-      padding: EdgeInsets.symmetric(horizontal: desktop ? 28 : 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: medqurLine)),
-      ),
-      child: Row(
-        children: [
-          if (!desktop) ...[
-            const MedqurLogo(width: 112),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: desktop ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-              children: [
-                Text(
-                  widget.facility.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-                const SizedBox(height: 2),
-                const Text('Active shift • Demo workspace', style: TextStyle(color: Color(0xFF78869A), fontSize: 11)),
-              ],
+  Widget _topBar(bool desktop) => Container(
+        height: 70,
+        padding: EdgeInsets.symmetric(horizontal: desktop ? 28 : 16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: medqurLine)),
+        ),
+        child: Row(
+          children: [
+            if (!desktop) ...[const MedqurLogo(width: 108), const SizedBox(width: 10)],
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: desktop ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    widget.facility.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: medqurInk, fontWeight: FontWeight.w800, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Active shift • ${widget.facility.classification.shortLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF78869A), fontSize: 11),
+                  ),
+                ],
+              ),
             ),
-          ),
-          if (desktop) ...[
-            const SizedBox(width: 14),
-            const StatusPill(label: 'Secure session', color: medqurGreen, icon: Icons.lock_rounded),
           ],
-        ],
-      ),
-    );
-  }
+        ),
+      );
 }
 
 class _NavItem {
