@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/prescription_document.dart';
 import '../services/prescription_template_image.dart';
+import '../services/signature_rendering.dart';
 import '../services/signature_vault.dart';
 
 class PrescriptionFormPreview extends StatelessWidget {
@@ -17,6 +18,8 @@ class PrescriptionFormPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final template = PrescriptionTemplateImage.bytes();
+    final safeSignature = SignatureRendering.onWhitePaper(data.signature.imageBytes);
+    final signatureValid = SignatureRendering.looksLikeSignature(safeSignature);
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
@@ -195,13 +198,28 @@ class PrescriptionFormPreview extends StatelessWidget {
                         top: y(PrescriptionTemplateLayout.signature.y),
                         width: x(PrescriptionTemplateLayout.signature.w),
                         height: y(PrescriptionTemplateLayout.signature.h),
-                        child: Image.memory(
-                          data.signature.imageBytes,
-                          fit: BoxFit.contain,
-                          alignment: Alignment.centerLeft,
-                          gaplessPlayback: true,
-                          filterQuality: FilterQuality.high,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        child: ColoredBox(
+                          color: Colors.white,
+                          child: signatureValid
+                              ? Image.memory(
+                                  safeSignature,
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.centerLeft,
+                                  gaplessPlayback: true,
+                                  filterQuality: FilterQuality.high,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                )
+                              : Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Recapture signature',
+                                    style: typed.copyWith(
+                                      color: const Color(0xFFB33A48),
+                                      fontSize: constraints.maxWidth * .0125,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ],
