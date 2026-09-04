@@ -233,6 +233,14 @@ class DoctorSignatureVault {
 }
 
 abstract final class SignatureImageProcessor {
+  /// Extracts pen strokes from a photograph of a signature on plain paper.
+  ///
+  /// The old implementation treated every dark pixel as ink. A shadow, table
+  /// edge or unevenly lit paper could therefore become one large opaque blob.
+  /// This version estimates the paper brightness in small blocks and only keeps
+  /// pixels that are meaningfully darker than their local background (or have a
+  /// strong blue-ink colour signal). It also removes isolated camera noise and
+  /// rejects captures that still look like a large filled region.
   static Future<Uint8List> fromPaperPhoto(
     Uint8List sourceBytes, {
     PrescriptionInk ink = PrescriptionInk.blue,
@@ -241,41 +249,136 @@ abstract final class SignatureImageProcessor {
     if (decoded == null) {
       throw const FormatException('The signature photo could not be decoded.');
     }
+
     var source = img.bakeOrientation(decoded);
-    if (source.width > 1800) {
-      source = img.copyResize(source, width: 1800, interpolation: img.Interpolation.average);
+    const maxDimension = 1400;
+    if (source.width >= source.height && source.width > maxDimension) {
+      source = img.copyResize(
+        source,
+        width: maxDimension,
+        interpolation: img.Interpolation.average,
+      );
+    } else if (source.height > maxDimension) {
+      source = img.copyResize(
+        source,
+        height: maxDimension,
+        interpolation: img.Interpolation.average,
+      );
+    }
+
+    const blockSize = 36;
+    final blocksX = (source.width + blockSize - 1) ~/ blockSize;
+    final blocksY = (source.height + blockSize - 1) ~/ blockSize;
+    final sums = List<double>.filled(blocksX * blocksY, 0);
+    final counts = List<int>.filled(blocksX * blocksY, 0);
+
+    double luminance(img.Pixel p) {
+      final r = p.r.toDouble();
+      final g = p.g.toDouble();
+      final b = p.b.toDouble();
+      return (0.299 * r) + (0.587 * g) + (0.114 * b);
+    }
+
+    for (var y = 0; y < source.height; y++) {
+      final by = y ~/ blockSize;
+      for (var x = 0; x < source.width; x++) {
+        final bx = x ~/ blockSize;
+        final index = by * blocksX + bx;
+        sums[index] += luminance(source.getPixel(x, y));
+        counts[index]++;
+      }
+    }
+
+    final backgrounds = List<double>.generate(sums.length, (index) {
+      final count = counts[index];
+      if (count == 0) return 255;
+      // A small lift compensates for dark pen strokes lowering the block mean.
+      return (sums[index] / count + 10).clamp(0, 255).toDouble();
+    });
+
+    double backgroundAt(int x, int y) {
+      final bx = (x ~/ blockSize).clamp(0, blocksX - 1);
+      final by = (y ~/ blockSize).clamp(0, blocksY - 1);
+      return backgrounds[by * blocksX + bx];
+    }
+
+    bool strongInkAt(int x, int y) {
+      final p = source.getPixel(x, y);
+      final r = p.r.toDouble();
+      final g = p.g.toDouble();
+      final b = p.b.toDouble();
+      final lum = luminance(p);
+      final localDrop = backgroundAt(x, y) - lum;
+      final blueBias = b - (r > g ? r : g);
+      final chromaMax = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      final chromaMin = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      final chroma = chromaMax - chromaMin;
+      final bluePen = blueBias > 10 && chroma > 18 && lum < 238;
+
+      if (bluePen && localDrop >= 10) return true;
+      return localDrop >= 36 && lum < 225;
+    }
+
+    final pixelCount = source.width * source.height;
+    final rawMask = Uint8List(pixelCount);
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        if (strongInkAt(x, y)) rawMask[y * source.width + x] = 1;
+      }
+    }
+
+    // Remove isolated sensor noise while retaining continuous pen strokes.
+    final mask = Uint8List(pixelCount);
+    for (var y = 1; y < source.height - 1; y++) {
+      for (var x = 1; x < source.width - 1; x++) {
+        final index = y * source.width + x;
+        if (rawMask[index] == 0) continue;
+        var neighbours = 0;
+        for (var yy = -1; yy <= 1; yy++) {
+          for (var xx = -1; xx <= 1; xx++) {
+            if (xx == 0 && yy == 0) continue;
+            neighbours += rawMask[(y + yy) * source.width + (x + xx)];
+          }
+        }
+        if (neighbours >= 2) mask[index] = 1;
+      }
     }
 
     var minX = source.width;
     var minY = source.height;
     var maxX = -1;
     var maxY = -1;
-
-    bool isInk(img.Pixel p) {
-      final r = p.r.toDouble();
-      final g = p.g.toDouble();
-      final b = p.b.toDouble();
-      final luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
-      final bluePen = b > r + 10 && b > g + 4 && luminance < 225;
-      return luminance < 178 || bluePen;
-    }
-
+    var inkPixels = 0;
     for (var y = 0; y < source.height; y++) {
       for (var x = 0; x < source.width; x++) {
-        if (!isInk(source.getPixel(x, y))) continue;
+        if (mask[y * source.width + x] == 0) continue;
+        inkPixels++;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       }
     }
-    if (maxX < minX || maxY < minY) {
+
+    if (inkPixels < 60 || maxX < minX || maxY < minY) {
       throw const FormatException(
-        'No clear pen strokes were detected. Use plain white paper and good lighting.',
+        'No clear signature strokes were detected. Fill most of the frame with clean white paper and write the signature in blue or black pen.',
       );
     }
 
-    const padding = 24;
+    final boxWidth = maxX - minX + 1;
+    final boxHeight = maxY - minY + 1;
+    final boxArea = boxWidth * boxHeight;
+    final fillRatio = boxArea == 0 ? 1.0 : inkPixels / boxArea;
+    final coversMostFrame =
+        boxWidth > source.width * .90 && boxHeight > source.height * .90;
+    if ((coversMostFrame && fillRatio > .10) || fillRatio > .42) {
+      throw const FormatException(
+        'Too much dark content was detected. Retake the photo on plain white paper with the camera aimed directly at the signature and avoid shadows, table edges or printed text.',
+      );
+    }
+
+    const padding = 28;
     minX = (minX - padding).clamp(0, source.width - 1).toInt();
     minY = (minY - padding).clamp(0, source.height - 1).toInt();
     maxX = (maxX + padding).clamp(0, source.width - 1).toInt();
@@ -290,18 +393,34 @@ abstract final class SignatureImageProcessor {
         ? const [21, 74, 166]
         : const [23, 32, 43];
 
+    bool hasStrongNeighbour(int x, int y) {
+      for (var yy = -1; yy <= 1; yy++) {
+        final py = y + yy;
+        if (py < 0 || py >= source.height) continue;
+        for (var xx = -1; xx <= 1; xx++) {
+          final px = x + xx;
+          if (px < 0 || px >= source.width) continue;
+          if (mask[py * source.width + px] == 1) return true;
+        }
+      }
+      return false;
+    }
+
     for (var y = minY; y <= maxY; y++) {
       for (var x = minX; x <= maxX; x++) {
         final p = source.getPixel(x, y);
-        final r = p.r.toDouble();
-        final g = p.g.toDouble();
-        final b = p.b.toDouble();
-        final luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
-        final bluePen = b > r + 10 && b > g + 4 && luminance < 230;
-        final strength = bluePen
-            ? ((235 - luminance) * 2.8)
-            : ((205 - luminance) * 4.0);
-        final alpha = strength.clamp(0, 255).round();
+        final lum = luminance(p);
+        final localDrop = backgroundAt(x, y) - lum;
+        final strong = mask[y * source.width + x] == 1;
+        final edge = !strong && localDrop >= 18 && hasStrongNeighbour(x, y);
+        if (!strong && !edge) {
+          out.setPixelRgba(x - minX, y - minY, 0, 0, 0, 0);
+          continue;
+        }
+
+        final alpha = (localDrop * (strong ? 5.1 : 2.7))
+            .clamp(0, 255)
+            .round();
         out.setPixelRgba(
           x - minX,
           y - minY,
@@ -315,7 +434,11 @@ abstract final class SignatureImageProcessor {
 
     var result = out;
     if (result.width > 1100) {
-      result = img.copyResize(result, width: 1100, interpolation: img.Interpolation.average);
+      result = img.copyResize(
+        result,
+        width: 1100,
+        interpolation: img.Interpolation.average,
+      );
     }
     return Uint8List.fromList(img.encodePng(result, level: 8));
   }
