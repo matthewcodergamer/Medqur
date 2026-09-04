@@ -2,8 +2,9 @@
 """Configure generated Flutter platforms for Medqur.
 
 The repository intentionally generates platform scaffolding in CI. This script
-adds permissions/native auth/printing setup and creates branded raster app icons
-from the same geometry as assets/medqur_app_icon.svg.
+adds permissions/native auth/printing setup, hardens the iPhone/iPad web shell,
+and creates branded raster app icons from the same geometry as
+assets/medqur_app_icon.svg.
 """
 from __future__ import annotations
 
@@ -18,6 +19,57 @@ ROOT = Path(__file__).resolve().parents[1]
 BLUE = (52, 116, 230)
 WHITE = (255, 255, 255)
 SVG = (ROOT / "assets" / "medqur_app_icon.svg").read_text(encoding="utf-8")
+
+MOBILE_VIEWPORT = (
+    '<meta name="viewport" '
+    'content="width=device-width, initial-scale=1.0, minimum-scale=1.0, '
+    'maximum-scale=1.0, user-scalable=no, viewport-fit=cover">'
+)
+
+MOBILE_WEB_STYLE = """  <style id="medqur-mobile-web">
+    /* Keep Flutter's logical viewport matched to the iPhone screen. */
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
+      background: #F8F9FA;
+    }
+
+    body {
+      position: fixed;
+      inset: 0;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      background: #F8F9FA;
+    }
+
+    /* iOS Safari auto-zooms focused form controls below 16px. Flutter uses
+       DOM text-editing controls underneath its rendered fields, so keep those
+       controls at the Safari-safe size without changing the visual Dart theme. */
+    flt-text-editing-host input,
+    flt-text-editing-host textarea,
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+
+    @supports (height: 100dvh) {
+      html,
+      body {
+        height: 100dvh;
+      }
+    }
+  </style>"""
 
 
 def icon(size: int) -> Image.Image:
@@ -138,6 +190,55 @@ def configure_ios() -> None:
             save_icon(appicons / filename, pixels)
 
 
+def _configure_mobile_web_shell(text: str) -> str:
+    viewport_pattern = re.compile(
+        r'<meta\s+name=["\']viewport["\'][^>]*>',
+        flags=re.IGNORECASE,
+    )
+    if viewport_pattern.search(text):
+        text = viewport_pattern.sub(MOBILE_VIEWPORT, text, count=1)
+    else:
+        text = text.replace("<head>", f"<head>\n  {MOBILE_VIEWPORT}", 1)
+
+    apple_meta = [
+        '<meta name="apple-mobile-web-app-capable" content="yes">',
+        '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
+        '<meta name="format-detection" content="telephone=no">',
+    ]
+    for tag in apple_meta:
+        name = re.search(r'name="([^"]+)"', tag).group(1)
+        if f'name="{name}"' not in text:
+            text = text.replace("</head>", f"  {tag}\n</head>", 1)
+
+    style_pattern = re.compile(
+        r'\s*<style\s+id=["\']medqur-mobile-web["\']>.*?</style>',
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if style_pattern.search(text):
+        text = style_pattern.sub("\n" + MOBILE_WEB_STYLE, text, count=1)
+    else:
+        text = text.replace("</head>", MOBILE_WEB_STYLE + "\n</head>", 1)
+
+    # Fail CI immediately if a future Flutter template change prevents the
+    # iPhone viewport hardening from being written into the generated shell.
+    required = (
+        'width=device-width',
+        'initial-scale=1.0',
+        'maximum-scale=1.0',
+        'viewport-fit=cover',
+        'medqur-mobile-web',
+        '-webkit-text-size-adjust: 100%',
+        'font-size: 16px !important',
+    )
+    missing = [value for value in required if value not in text]
+    if missing:
+        raise RuntimeError(
+            "Generated web shell is missing iPhone viewport protections: "
+            + ", ".join(missing)
+        )
+    return text
+
+
 def configure_web() -> None:
     web = ROOT / "web"
     if not web.exists():
@@ -155,6 +256,7 @@ def configure_web() -> None:
     text = re.sub(r'<link rel="icon" type="image/png" href="favicon.png"\s*/?>', '<link rel="icon" type="image/svg+xml" href="favicon.svg">', text)
     if 'name="theme-color"' not in text:
         text = text.replace("</head>", '  <meta name="theme-color" content="#FFFFFF">\n</head>')
+    text = _configure_mobile_web_shell(text)
     index.write_text(text, encoding="utf-8")
 
     manifest = web / "manifest.json"
@@ -164,6 +266,7 @@ def configure_web() -> None:
         data["short_name"] = "Medqur"
         data["background_color"] = "#FFFFFF"
         data["theme_color"] = "#FFFFFF"
+        data["display"] = "standalone"
         manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
@@ -171,7 +274,7 @@ def main() -> None:
     configure_android()
     configure_ios()
     configure_web()
-    print("Configured Medqur platform permissions, native auth, printing, network access, and icons.")
+    print("Configured Medqur platform permissions, native auth, iPhone web viewport, printing, network access, and icons.")
 
 
 if __name__ == "__main__":
