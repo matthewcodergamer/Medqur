@@ -77,12 +77,10 @@ abstract final class PrescriptionTemplateImage {
     return Uint8List.fromList(img.encodePng(normalized, level: 6));
   }
 
-  /// `package:image` normally exposes 8-bit PNG channels as 0..255. Retain a
-  /// narrow compatibility path for a normalized 0..1 channel representation.
-  static int _channel8(double value) {
-    if (value >= 0 && value <= 1) {
-      return (value * 255).round().clamp(0, 255).toInt();
-    }
-    return value.round().clamp(0, 255).toInt();
-  }
+  /// The bundled MRH form is an ordinary 8-bit PNG, so channel values are
+  /// already 0..255. Do not reinterpret a legitimate value such as 1 as a
+  /// normalized 0..1 float: doing that turns near-black one-pixel text/rules
+  /// into white and can erase the entire prescription form in CI/browser use.
+  static int _channel8(double value) =>
+      value.round().clamp(0, 255).toInt();
 }
