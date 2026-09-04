@@ -4,15 +4,28 @@ Medqur is a Flutter clinical-workflow prototype for web, Android and iOS, backed
 
 > **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration. Production use requires formal governance, clinical validation, approved identity/data integrations, security review and deployment controls.
 
-## V0.11.2 — prescription rendering, signature extraction and medication-search fixes
+## V0.11.3 — iPhone browser viewport and prescription-signature hardening
 
-V0.11.2 focuses on the problems found during real device testing of the V0.11 prescription workflow. It keeps the calmer V0.11.1 interface while fixing the prescription preview, preventing photographed signatures from becoming large dark blobs, refining the medication capsule artwork and expanding the development medication catalogue.
+V0.11.3 continues the V0.11.2 prescription and medication work, with two device-level fixes found during iPhone Safari testing: the web app no longer remains visually zoomed after text-field/keyboard interactions, and stored signatures are rendered on prescription-safe pure white instead of relying on transparent PNG compositing that could appear as a dark or grey block in some browser/PDF paths.
+
+### iPhone / Safari browser viewport fix
+
+The generated Flutter web shell now writes a hardened mobile viewport specifically for iPhone/iPad browser use:
+
+- `width=device-width` with a fixed initial scale and `viewport-fit=cover`;
+- 100% / dynamic-viewport sizing for the Flutter host rather than a stale visual viewport;
+- iOS text-size adjustment locked to 100%;
+- underlying browser editing controls held at 16px so Safari does not auto-zoom when a field receives focus;
+- a small runtime zoom guard that re-applies the viewport after focus/keyboard dismissal, page restoration and orientation changes;
+- a reset to the top-left visual origin after the iOS keyboard closes so the whole Flutter interface does not remain magnified or offset.
+
+The CI platform-generation step checks that these protections are actually present in the generated `web/index.html`, so a future Flutter template change cannot silently remove them.
 
 ### Prescription-template rendering fix
 
 The supplied **Southern Regional Health Authority / Mandeville Regional Hospital** prescription sheet (`SRHA.MRH.CM2013`) remains the print base. Medqur does not substitute a cartoon/redrawn prescription for the hospital form.
 
-The compact embedded template is normalized at runtime into a standard four-channel RGBA PNG before it is given to Flutter or the PDF engine. This removes the browser/iOS decoder edge case that could show a plain grey rectangle instead of the prescription form. The same normalized bytes are used for the on-screen preview and generated PDF, and the rendering path is now covered by an automated image-decode test.
+The compact embedded template is normalized at runtime into a standard four-channel RGBA PNG before it is given to Flutter or the PDF engine. This removes the browser/iOS decoder edge case that could show a plain grey rectangle instead of the prescription form. The same normalized bytes are used for the on-screen preview and generated PDF, and the rendering path is covered by automated image-decode tests.
 
 The preview overlays:
 
@@ -26,22 +39,15 @@ The preview overlays:
 
 Patient/system fields use clean typed text. Medication directions use a restrained digital-pen appearance and can be rendered in blue or black ink.
 
-### Paper-signature extraction fix
+### Paper-signature extraction and rendering fix
 
-The previous paper-photo processor could treat a shadow, desk edge or generally dark photograph as signature ink. V0.11.2 changes the extraction pipeline to:
+The paper-photo processor estimates paper brightness locally in small blocks rather than treating every dark pixel as signature ink. It detects blue-pen colour separately from neutral/black ink, requires meaningful local contrast, removes isolated camera noise, keeps softer edge pixels around real strokes and rejects captures that still resemble one large filled region.
 
-- resize oversized camera captures before analysis;
-- estimate paper brightness locally in small blocks rather than using one global dark-pixel threshold;
-- detect blue-pen colour separately from neutral/black ink;
-- require meaningful local contrast from the surrounding paper;
-- remove isolated camera/sensor noise;
-- retain softer edge pixels around strong pen strokes for smoother transparent artwork;
-- reject captures whose dark area still looks like one large filled blob;
-- return a clear retake message when shadows, printed material or table edges dominate the frame.
+V0.11.3 adds a second rendering stage designed around the actual hospital form. After the signature strokes are isolated and cropped, Medqur composites the cleaned artwork onto **pure white paper** before storing/displaying a photographed signature. Because the prescription form itself is white, this safely blends into the form and avoids browser/PDF alpha-transparency failures that can turn transparent image data into one large block.
 
-A functional test creates unevenly lit synthetic paper with a broad shadow and signature-like blue strokes, then verifies that the extracted result remains mostly transparent rather than becoming a solid block.
+Existing stored signatures are also normalized onto white at preview/print time. If an old stored image is overwhelmingly dark or does not resemble usable handwriting, Medqur displays a recapture warning rather than pasting the bad block onto the prescription. Printing is blocked until a usable signature is selected.
 
-Doctors can still create signatures by drawing with a finger/stylus or photographing a signature written on clean white paper. Multiple signatures, a preferred default, alternate selection, rename/delete controls and per-prescription SHA-256 attestations remain supported.
+Doctors can create signatures by drawing with a finger/stylus or photographing a signature written on clean white paper. Multiple signatures, a preferred default, alternate selection, rename/delete controls and per-prescription SHA-256 attestations remain supported.
 
 ## Less-is-more design system
 
@@ -54,7 +60,7 @@ The visual target remains restrained government/hospital software rather than a 
 - Medqur blue is reserved mainly for primary actions; green, amber and red are reserved for verified/safety/acuity meaning.
 - Smaller shadows, corner radii, status pills, icons and headings.
 - Reduced motion with short fades/slides instead of decorative animation.
-- The medication capsule remains a low-risk browse motif only. V0.11.2 makes it shorter and chunkier so it reads as a real capsule rather than a long decorative bar.
+- The medication capsule remains a low-risk browse motif only and uses the shorter, fuller shape introduced in V0.11.2.
 
 The sign-in page is intentionally simple: staff ID, primary authentication action, secure staff-QR scanning and optional prototype/demo access only where explicitly labeled.
 
@@ -75,6 +81,8 @@ Medqur never receives a fingerprint or face template; the operating system retur
 ### Browser prototype
 
 The public web build does not claim native Face ID/fingerprint authentication through Flutter `local_auth`. The browser fallback is a **six-digit local session PIN** with a random salt, salted SHA-256 verifier, constant-time comparison, and lockout after repeated failed attempts.
+
+The iPhone/iPad browser shell now includes the Safari viewport/keyboard protections described above so focusing fields does not leave the clinical workspace permanently zoomed or offset.
 
 This PIN is a development guard, not production identity authentication. Production browser access should use an approved OIDC/WebAuthn relying party, preferably passkeys/security keys with server-issued challenges and government/Medqur identity policy.
 
@@ -119,7 +127,7 @@ Medication scanning accepts supported real package formats including GS1 DataMat
 
 Resolution is trust-aware: configured medication registry/master first, then local cache/observed package data and public reference data where appropriate, with pharmacist verification when unresolved. Unknown products remain unknown rather than being guessed.
 
-V0.11.2 expands the **unverified development catalogue** so prescription/search screens can exercise more realistic forms and therapeutic categories while an authoritative Jamaica feed is unavailable. Development fixtures now include, among others, paracetamol, amoxicillin, amoxicillin/clavulanic acid, ibuprofen, azithromycin, doxycycline, ceftriaxone, metformin, amlodipine, lisinopril, omeprazole, cetirizine, salbutamol, fluconazole and oral rehydration salts, in addition to the observed-package scanner fixtures.
+The **unverified development catalogue** lets prescription/search screens exercise realistic forms and therapeutic categories while an authoritative Jamaica feed is unavailable. Development fixtures include, among others, paracetamol, amoxicillin, amoxicillin/clavulanic acid, ibuprofen, azithromycin, doxycycline, ceftriaxone, metformin, amlodipine, lisinopril, omeprazole, cetirizine, salbutamol, fluconazole and oral rehydration salts, in addition to observed-package scanner fixtures.
 
 These added rows are explicitly `unreviewed` / `unverified`, use `medqur_prototype_catalogue` provenance and are **not** represented as Jamaica-approved products or prescribing recommendations.
 
@@ -147,7 +155,7 @@ The prototype generates a dynamic wristband PDF and opens the system print servi
 
 ### Prescriptions
 
-V0.11.2 generates the SRHA/MRH prescription form as a print-ready PDF with dynamic patient/prescriber information, medication directions and the selected stored signature. Preview and PDF generation consume the same normalized form image to reduce platform differences.
+Medqur generates the SRHA/MRH prescription form as a print-ready PDF with dynamic patient/prescriber information, medication directions and the selected stored signature. The prescription image is normalized for Flutter/PDF rendering, and photographed signatures are flattened onto pure white before being inserted into the white hospital form.
 
 A production deployment must validate legal/clinical requirements for electronic/printed prescriptions, signature policy, controlled medicines and pharmacy acceptance before use.
 
@@ -171,7 +179,7 @@ Production still requires authorized external infrastructure for NIRA, Ministry/
 
 GitHub Actions is the release gate on `main` and performs backend TypeScript validation, PostgreSQL schema startup, medication-registry/staff-ID smoke tests, Flutter analysis/tests, Android APK build, web release/Pages publication and unsigned iOS build/package.
 
-V0.11.2 adds a prescription-rendering test that verifies the embedded hospital form decodes into a non-empty RGBA image and a signature-processing test that verifies uneven paper lighting does not become one opaque signature blob.
+V0.11.3 validates the full-width MRH form, signature extraction under uneven paper lighting, signature white-paper compositing, medication identification/safety behavior and the generated iPhone web-shell viewport protections.
 
 Local Flutter development:
 
@@ -193,7 +201,7 @@ The unsigned iOS artifact is only build validation; normal iPhone distribution r
 ## Repository structure
 
 - `lib/screens/` — clinical, pharmacy, scan, identity and prescription workflows
-- `lib/services/` — medication registry, pharmacy API, NIDS, biometric/browser session guards, persistence, signature vault and print generation
+- `lib/services/` — medication registry, pharmacy API, NIDS, biometric/browser session guards, persistence, signature vault/rendering and print generation
 - `lib/widgets/` — shared design system, scanner helpers, signature pad and prescription-form preview
 - `lib/generated/prescription_template_data.dart` — embedded/normalized MRH prescription form
 - `backend/sql/005_prototype_medication_catalog.sql` — expanded unverified development medication seed
