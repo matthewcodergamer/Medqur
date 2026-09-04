@@ -366,13 +366,13 @@ class PatientContextBar extends StatelessWidget {
 /// A restrained medication motif for low-risk browsing surfaces only.
 /// It should not be used on prescribing confirmation or administration screens.
 class CapsuleIllustration extends StatelessWidget {
-  const CapsuleIllustration({super.key, this.width = 124});
+  const CapsuleIllustration({super.key, this.width = 118});
   final double width;
 
   @override
   Widget build(BuildContext context) => SizedBox(
         width: width,
-        height: width * .54,
+        height: width * .62,
         child: CustomPaint(painter: _CapsulePainter()),
       );
 }
@@ -381,17 +381,14 @@ class _CapsulePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.translate(size.width * .14, size.height * .12);
+    canvas.translate(size.width * .17, size.height * .10);
     canvas.rotate(-math.pi / 15);
 
+    final capsuleWidth = size.width * .64;
+    final capsuleHeight = size.height * .50;
     final shadowRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        3,
-        4,
-        size.width * .70,
-        size.height * .40,
-      ),
-      Radius.circular(size.height * .20),
+      Rect.fromLTWH(3, 4, capsuleWidth, capsuleHeight),
+      Radius.circular(capsuleHeight / 2),
     );
     canvas.drawRRect(
       shadowRect,
@@ -400,12 +397,7 @@ class _CapsulePainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
 
-    final rect = Rect.fromLTWH(
-      0,
-      0,
-      size.width * .70,
-      size.height * .40,
-    );
+    final rect = Rect.fromLTWH(0, 0, capsuleWidth, capsuleHeight);
     final capsule = RRect.fromRectAndRadius(
       rect,
       Radius.circular(rect.height / 2),
