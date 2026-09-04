@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../generated/prescription_template_data.dart';
 import '../services/prescription_document.dart';
+import '../services/prescription_template_image.dart';
 import '../services/signature_vault.dart';
 
 class PrescriptionFormPreview extends StatelessWidget {
@@ -16,7 +16,7 @@ class PrescriptionFormPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final template = prescriptionTemplatePngBytes();
+    final template = PrescriptionTemplateImage.bytes();
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
