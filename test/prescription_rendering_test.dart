@@ -36,7 +36,8 @@ void main() {
     for (var y = 0; y < source.height; y++) {
       for (var x = 0; x < source.width; x++) {
         // Simulate real paper with gentle uneven lighting and a broad shadow.
-        final shade = 250 - ((x / source.width) * 16).round() -
+        final shade = 250 -
+            ((x / source.width) * 16).round() -
             ((y / source.height) * 7).round();
         source.setPixelRgb(x, y, shade, shade, shade);
       }
@@ -52,12 +53,52 @@ void main() {
     }
 
     // Draw a blue signature-like set of continuous strokes.
-    const blue = img.ColorRgb8(22, 70, 166);
-    img.drawLine(source, x1: 170, y1: 185, x2: 255, y2: 125, color: blue, thickness: 6);
-    img.drawLine(source, x1: 255, y1: 125, x2: 310, y2: 205, color: blue, thickness: 6);
-    img.drawLine(source, x1: 310, y1: 205, x2: 375, y2: 135, color: blue, thickness: 6);
-    img.drawLine(source, x1: 375, y1: 135, x2: 480, y2: 185, color: blue, thickness: 6);
-    img.drawLine(source, x1: 215, y1: 205, x2: 520, y2: 210, color: blue, thickness: 5);
+    final blue = img.ColorRgb8(22, 70, 166);
+    img.drawLine(
+      source,
+      x1: 170,
+      y1: 185,
+      x2: 255,
+      y2: 125,
+      color: blue,
+      thickness: 6,
+    );
+    img.drawLine(
+      source,
+      x1: 255,
+      y1: 125,
+      x2: 310,
+      y2: 205,
+      color: blue,
+      thickness: 6,
+    );
+    img.drawLine(
+      source,
+      x1: 310,
+      y1: 205,
+      x2: 375,
+      y2: 135,
+      color: blue,
+      thickness: 6,
+    );
+    img.drawLine(
+      source,
+      x1: 375,
+      y1: 135,
+      x2: 480,
+      y2: 185,
+      color: blue,
+      thickness: 6,
+    );
+    img.drawLine(
+      source,
+      x1: 215,
+      y1: 205,
+      x2: 520,
+      y2: 210,
+      color: blue,
+      thickness: 5,
+    );
 
     final output = await SignatureImageProcessor.fromPaperPhoto(
       Uint8List.fromList(img.encodePng(source)),
