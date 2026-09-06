@@ -23,7 +23,7 @@ PrescriptionRecord _record({
       orderedById: '482731',
       orderedByName: 'Dr. Maya Brown',
       orderedAt: DateTime.utc(2026, 9, 6, 1, revision),
-      signatureDigest: 'a' * 64,
+      signatureDigest: List<String>.filled(64, 'a').join(),
       signatureSignedAt: DateTime.utc(2026, 9, 6, 1, revision),
       signatureMethod: 'stored-drawn',
       copyNumber: 'RX-TEST-R$revision',
@@ -57,8 +57,10 @@ void main() {
     expect(history.length, 2);
     expect(history.first.id, 'RXO-2');
     expect(history.first.isActive, isTrue);
-    expect(history.first.amendmentReason,
-        'Increase frequency after reassessment');
+    expect(
+      history.first.amendmentReason,
+      'Increase frequency after reassessment',
+    );
     expect(history.last.id, 'RXO-1');
     expect(history.last.isSuperseded, isTrue);
   });
