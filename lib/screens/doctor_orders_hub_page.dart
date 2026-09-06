@@ -4,6 +4,7 @@ import '../clinical_models.dart';
 import '../models.dart';
 import '../widgets/common.dart';
 import '../widgets/medqur_design.dart';
+import '../widgets/medqur_responsive.dart';
 
 class DoctorOrdersHubPage extends StatelessWidget {
   const DoctorOrdersHubPage({
@@ -45,30 +46,26 @@ class DoctorOrdersHubPage extends StatelessWidget {
           .compareTo(a.completedAt ?? a.orderedAt));
 
     return MedqurPage(
+      wide: true,
       children: [
         const MedqurPageHeader(
           eyebrow: 'Doctor workspace',
           title: 'Orders',
-          subtitle:
-              'Prescriptions, investigations and completed results for your current patient workload.',
+          subtitle: 'Prescriptions, investigations and results.',
         ),
-        const SizedBox(height: 18),
-        Row(
+        const SizedBox(height: 16),
+        ResponsiveActions(
+          minActionWidth: 190,
           children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: onCreatePrescription,
-                icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('Prescription'),
-              ),
+            FilledButton.icon(
+              onPressed: onCreatePrescription,
+              icon: const Icon(Icons.edit_note_rounded),
+              label: const Text('Prescription'),
             ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onCreateDiagnosticOrder,
-                icon: const Icon(Icons.add_task_rounded),
-                label: const Text('Test / procedure'),
-              ),
+            OutlinedButton.icon(
+              onPressed: onCreateDiagnosticOrder,
+              icon: const Icon(Icons.add_task_rounded),
+              label: const Text('Test / procedure'),
             ),
           ],
         ),
@@ -89,14 +86,19 @@ class DoctorOrdersHubPage extends StatelessWidget {
             ),
           )
         else
-          for (final order in activeDiagnostics)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: _DiagnosticCard(
-                order: order,
-                onTap: () => onOpenDiagnosticOrder(order),
-              ),
-            ),
+          ResponsiveGrid(
+            minItemWidth: 330,
+            maxColumns: 2,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final order in activeDiagnostics)
+                _DiagnosticCard(
+                  order: order,
+                  onTap: () => onOpenDiagnosticOrder(order),
+                ),
+            ],
+          ),
         const SizedBox(height: 20),
         SectionTitle(
           'Medication orders',
@@ -114,46 +116,19 @@ class DoctorOrdersHubPage extends StatelessWidget {
             ),
           )
         else
-          for (final item in medicationOrders)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: SoftCard(
-                padding: const EdgeInsets.all(14),
-                onTap: () => onOpenPatient(item.patient),
-                child: Row(
-                  children: [
-                    const Icon(Icons.medication_outlined,
-                        color: medqurBlue, size: 21),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.patient.name,
-                            style: const TextStyle(
-                              color: medqurInk,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${item.medication.name} ${item.medication.dose} • ${item.medication.route} • ${item.medication.frequency}',
-                            style: const TextStyle(
-                              color: Color(0xFF687587),
-                              fontSize: 10.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Color(0xFF9AA4B1)),
-                  ],
+          ResponsiveGrid(
+            minItemWidth: 330,
+            maxColumns: 2,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final item in medicationOrders)
+                _MedicationCard(
+                  item: item,
+                  onTap: () => onOpenPatient(item.patient),
                 ),
-              ),
-            ),
+            ],
+          ),
         if (completedDiagnostics.isNotEmpty) ...[
           const SizedBox(height: 20),
           SectionTitle(
@@ -164,18 +139,83 @@ class DoctorOrdersHubPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          for (final order in completedDiagnostics.take(6))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: _DiagnosticCard(
-                order: order,
-                onTap: () => onOpenDiagnosticOrder(order),
-              ),
-            ),
+          ResponsiveGrid(
+            minItemWidth: 330,
+            maxColumns: 2,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final order in completedDiagnostics.take(6))
+                _DiagnosticCard(
+                  order: order,
+                  onTap: () => onOpenDiagnosticOrder(order),
+                ),
+            ],
+          ),
         ],
       ],
     );
   }
+}
+
+class _MedicationCard extends StatelessWidget {
+  const _MedicationCard({required this.item, required this.onTap});
+
+  final _MedicationItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SoftCard(
+        onTap: onTap,
+        child: Row(
+          children: [
+            const Icon(Icons.medication_outlined, color: medqurBlue, size: 21),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.patient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: medqurInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${item.medication.name} ${item.medication.dose}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF687587),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    '${item.medication.route} • ${item.medication.frequency}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF7B8796),
+                      fontSize: 10.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF9AA4B1),
+            ),
+          ],
+        ),
+      );
 }
 
 class _DiagnosticCard extends StatelessWidget {
@@ -185,71 +225,95 @@ class _DiagnosticCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SoftCard(
-        padding: const EdgeInsets.all(14),
         onTap: onTap,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: medqurBlue.withValues(alpha: .07),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(_icon(order.type), color: medqurBlue, size: 20),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 315;
+            final status = StatusPill(
+              label: order.status.label,
+              color: order.status == DiagnosticOrderStatus.completed
+                  ? medqurGreen
+                  : medqurBlue,
+            );
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: medqurBlue.withValues(alpha: .07),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(_icon(order.type), color: medqurBlue, size: 20),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
+                      if (narrow) ...[
+                        Text(
                           order.studyName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: medqurInk,
                             fontSize: 12.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        const SizedBox(height: 5),
+                        status,
+                      ] else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                order.studyName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: medqurInk,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            status,
+                          ],
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${order.assignedDiscipline.label} • ${order.priority.label}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF748094),
+                          fontSize: 10.5,
+                        ),
                       ),
-                      StatusPill(
-                        label: order.status.label,
-                        color: order.status == DiagnosticOrderStatus.completed
-                            ? medqurGreen
-                            : medqurBlue,
-                      ),
+                      if (order.status == DiagnosticOrderStatus.completed &&
+                          order.resultSummary.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          order.resultSummary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF536274),
+                            fontSize: 10.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${order.patientId} • ${order.assignedDiscipline.label} • ${order.priority.label}',
-                    style: const TextStyle(
-                      color: Color(0xFF748094),
-                      fontSize: 10.5,
-                    ),
-                  ),
-                  if (order.status == DiagnosticOrderStatus.completed &&
-                      order.resultSummary.trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      order.resultSummary,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF536274),
-                        fontSize: 10.5,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       );
 
