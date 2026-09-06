@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../clinical_clock.dart';
 import '../clinical_models.dart';
 import '../models.dart';
 import '../services/clinical_order_store.dart';
 import '../widgets/common.dart';
+import '../widgets/medqur_responsive.dart';
 import 'clinical_order_composer_page.dart';
 import 'clinical_order_detail_page.dart';
 import 'clinical_worklist_page.dart';
@@ -17,9 +19,9 @@ import 'prescription_composer_page.dart';
 import 'profile_page_v2.dart';
 import 'scan_page_v2.dart';
 
-/// Role-aware clinical shell introduced from the workforce/worklist voice-note
-/// update. Doctors own prescriptions and investigations; clinical-support staff
-/// receive routed work; pharmacy remains isolated to prescription fulfilment.
+/// Role-aware clinical shell. Doctors own prescriptions and investigations;
+/// clinical-support staff receive routed work; pharmacy remains isolated to
+/// prescription fulfilment. Navigation changes shape before content gets tight.
 class ClinicalShellV3 extends StatefulWidget {
   const ClinicalShellV3({
     super.key,
@@ -94,7 +96,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
         discipline != ClinicalDiscipline.triage) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Patient registration is limited to authorized clinical intake staff.'),
+          content: Text('Patient registration is limited to authorized intake staff.'),
         ),
       );
       return;
@@ -127,48 +129,67 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
       builder: (sheetContext) => SafeArea(
         child: FractionallySizedBox(
           heightFactor: .72,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                          color: medqurInk,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(description,
-                        style: const TextStyle(
-                          color: Color(0xFF718095),
-                          fontSize: 12,
-                        )),
-                  ],
-                ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: medqurInk,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF718095),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: widget.patients.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final patient = widget.patients[index];
+                        return ListTile(
+                          title: Text(
+                            patient.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            '${patient.age} • ${patient.sex} • ${patient.effectiveEncounterId}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.pop(sheetContext, patient),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: widget.patients.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final patient = widget.patients[index];
-                    return ListTile(
-                      title: Text(patient.name,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Text(
-                        '${patient.age} • ${patient.sex} • ${patient.effectiveEncounterId}',
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.pop(sheetContext, patient),
-                    );
-                  },
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -179,7 +200,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
     if (!_doctor) return;
     final patient = await _choosePatient(
       'New prescription',
-      'Choose the patient encounter to prescribe medication.',
+      'Choose a patient encounter.',
     );
     if (patient == null || !mounted) return;
     final order = await Navigator.of(context).push<MedicationOrder>(
@@ -195,7 +216,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
     patient.medications.add(order);
     patient.status = PatientStatus.treatment;
     patient.timeline.add(
-      '${TimeOfDay.now().format(context)} — ${order.name} ${order.dose} prescribed by ${widget.staff.name}',
+      '${ClinicalClock.time(DateTime.now())} — ${order.name} ${order.dose} prescribed by ${widget.staff.name}',
     );
     await widget.onPatientsChanged();
     if (mounted) setState(() {});
@@ -205,7 +226,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
     if (!_doctor) return;
     final patient = await _choosePatient(
       'New test / procedure',
-      'Choose the patient encounter, then route the order to the performing team.',
+      'Choose a patient, then route the order.',
     );
     if (patient == null || !mounted) return;
     final order = await Navigator.of(context).push<DiagnosticOrder>(
@@ -220,7 +241,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
     if (order == null || !mounted) return;
     _orders.insert(0, order);
     patient.timeline.add(
-      '${TimeOfDay.now().format(context)} — ${order.studyName} ordered by ${widget.staff.name}',
+      '${ClinicalClock.time(DateTime.now())} — ${order.studyName} ordered by ${widget.staff.name}',
     );
     await _saveOrders();
     await widget.onPatientsChanged();
@@ -311,7 +332,7 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
 
   @override
   Widget build(BuildContext context) {
-    final desktop = MediaQuery.sizeOf(context).width >= 980;
+    final desktop = MedqurResponsive.isDesktop(context);
     final destinations = <NavigationDestination>[
       const NavigationDestination(
         icon: Icon(Icons.home_outlined),
@@ -361,6 +382,8 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
                       onDestinationSelected: (value) =>
                           setState(() => _index = value),
                       labelType: NavigationRailLabelType.all,
+                      minWidth: 76,
+                      groupAlignment: -.82,
                       destinations: [
                         for (final item in destinations)
                           NavigationRailDestination(
@@ -372,7 +395,8 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
                     ),
                   Expanded(
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
+                      duration: const Duration(milliseconds: 160),
+                      switchInCurve: Curves.easeOutCubic,
                       child: KeyedSubtree(
                         key: ValueKey(_index),
                         child: _page(),
@@ -395,47 +419,55 @@ class _ClinicalShellV3State extends State<ClinicalShellV3> {
     );
   }
 
-  Widget _topBar() => Container(
-        height: 62,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: medqurLine)),
-        ),
-        child: Row(
-          children: [
-            const MedqurLogo(width: 96),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    widget.facility.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: medqurInk,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${widget.staff.workforceLabel} • ${widget.staff.clinicalDiscipline.label}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF78869A),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+  Widget _topBar() => LayoutBuilder(
+        builder: (context, constraints) {
+          final tiny = constraints.maxWidth < 390;
+          final desktop = constraints.maxWidth >= MedqurResponsive.desktop;
+          return Container(
+            height: desktop ? 64 : 58,
+            padding: EdgeInsets.symmetric(horizontal: tiny ? 10 : 14),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: medqurLine)),
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                MedqurLogo(width: tiny ? 80 : desktop ? 102 : 90),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        widget.facility.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: medqurInk,
+                          fontSize: tiny ? 11.5 : 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (!tiny) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.staff.workforceLabel} • ${widget.staff.clinicalDiscipline.label}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF78869A),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       );
 }
