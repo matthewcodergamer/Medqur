@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medqur/clinical_clock.dart';
 import 'package:medqur/medication_order_options.dart';
+import 'package:medqur/medication_prescribing_options.dart';
 
 void main() {
   group('structured medication directions', () {
@@ -14,20 +15,20 @@ void main() {
       );
     });
 
-    test('frequency selector is 1x through 10x per period', () {
+    test('frequency selector is 1x through 20x per period', () {
       expect(
         StructuredMedicationDirections.frequencyCounts,
-        orderedEquals(List<int>.generate(10, (index) => index + 1)),
+        orderedEquals(List<int>.generate(20, (index) => index + 1)),
       );
       const directions = StructuredMedicationDirections(
         doseValue: 5,
         doseUnit: MedicationDoseUnit.milligram,
-        frequencyCount: 3,
+        frequencyCount: 20,
         frequencyPeriod: MedicationFrequencyPeriod.day,
         dueMode: MedicationDueMode.immediate,
       );
       expect(directions.doseText, '5 mg');
-      expect(directions.frequencyText, '3x per day');
+      expect(directions.frequencyText, '20x per day');
     });
 
     test('supported periods are hour, day and week', () {
@@ -76,6 +77,42 @@ void main() {
         dueMode: MedicationDueMode.scheduled,
       );
       expect(() => invalid.effectiveDueAt(), throwsStateError);
+    });
+  });
+
+  group('prescribing option libraries', () {
+    test('route list is alphabetized and substantially expanded', () {
+      final sorted = [...MedicationPrescribingOptions.routes]..sort();
+      expect(MedicationPrescribingOptions.routes, orderedEquals(sorted));
+      expect(MedicationPrescribingOptions.routes.length, greaterThanOrEqualTo(18));
+      expect(
+        MedicationPrescribingOptions.routes,
+        containsAll(<String>[
+          'Intramuscular (IM)',
+          'Intravenous (IV)',
+          'Oral',
+          'Subcutaneous',
+          'Sublingual',
+          'Topical',
+        ]),
+      );
+    });
+
+    test('common instructions include voice-note safety examples', () {
+      expect(
+        MedicationPrescribingOptions.commonInstructions,
+        containsAll(<String>[
+          'Avoid alcohol',
+          'May cause drowsiness',
+          'Do not drive or operate machinery if drowsy',
+          'Take with food',
+          'Take before food',
+          'Take on an empty stomach',
+          'Take with milk',
+          'Do not take with milk',
+          'Take with water',
+        ]),
+      );
     });
   });
 
