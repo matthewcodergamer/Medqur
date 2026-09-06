@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../app_assets.dart';
 import '../models.dart';
+import 'medqur_responsive.dart';
 
 const medqurBlue = Color(0xFF2F67C7);
 const medqurNavy = Color(0xFF183B67);
@@ -151,23 +152,25 @@ class SoftCard extends StatelessWidget {
   const SoftCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding,
     this.onTap,
     this.highlighted = false,
   });
 
   final Widget child;
-  final EdgeInsets padding;
+  final EdgeInsets? padding;
   final VoidCallback? onTap;
   final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(16);
+    final phone = MedqurResponsive.isPhone(context);
+    final resolvedPadding = padding ?? EdgeInsets.all(phone ? 13 : 16);
+    final radius = BorderRadius.circular(phone ? 14 : 16);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: padding,
+      padding: resolvedPadding,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: radius,
@@ -179,9 +182,9 @@ class SoftCard extends StatelessWidget {
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x07000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Color(0x06000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -205,20 +208,40 @@ class SectionTitle extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: medqurInk,
-                  ),
-            ),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      );
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stack = trailing != null && constraints.maxWidth < 360;
+        final titleWidget = Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: medqurInk,
+              ),
+        );
+        if (trailing == null) return titleWidget;
+        if (stack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleWidget,
+              const SizedBox(height: 7),
+              trailing!,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: titleWidget),
+            const SizedBox(width: 10),
+            Flexible(child: trailing!),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class StatusPill extends StatelessWidget {
@@ -235,6 +258,7 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(maxWidth: 180),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: .065),
@@ -248,12 +272,16 @@ class StatusPill extends StatelessWidget {
               Icon(icon, size: 12.5, color: color),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
