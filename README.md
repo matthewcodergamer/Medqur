@@ -4,6 +4,44 @@ Medqur is a Flutter clinical-workflow prototype for web, Android and iOS with a 
 
 > **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration.
 
+## V0.12.1 — structured medication directions and unambiguous encounter time
+
+V0.12.1 implements the follow-up September 2026 medication-order and timeline voice notes.
+
+### Controlled medication dose
+
+Medication orders no longer use a free-text dose box in the doctor prescription flow or the patient medication-order sheet. The dose is split into two controlled selections:
+
+- **amount:** 1 through 100
+- **unit:** grams (`g`), milligrams (`mg`), micrograms (`mcg`), millilitres (`mL`), microlitres (`µL`) or litres (`L`)
+
+When a medication product has a strength that maps exactly into those selectors, Medqur can preselect it. Values outside the configured 1–100 range are not silently coerced.
+
+### Controlled frequency
+
+Frequency is now entered exactly as a structured combination rather than free text:
+
+- **1x through 10x**
+- the word **per**
+- **hour, day or week**
+
+Examples stored/displayed by the prototype are `1x per day`, `2x per day` and `3x per hour`.
+
+### Due immediately or due on a selected date/time
+
+Every new medication order explicitly chooses one of two due modes:
+
+- **Immediately** — the first dose becomes due at the time the order is signed/sent.
+- **On date / time** — the doctor chooses the due date and time using the existing calendar and time picker.
+
+The previous optional schedule control has therefore become an explicit clinical choice rather than an ambiguous empty field.
+
+### Encounter timeline clock
+
+Encounter timeline text now uses an explicit **24-hour `HH:mm` clock**. The patient timeline UI labels this convention so entries such as `06:37` and `18:37` cannot be confused with AM/PM times. Shared `ClinicalClock` formatting is used for new medication/prescription timeline events and due-date displays.
+
+Automated tests cover the 1–100 dose selector, 1x–10x frequency selector, supported dose units, hour/day/week periods, immediate vs scheduled due behavior, strength preset parsing and 24-hour time formatting.
+
 ## V0.12 — clinical orders and support-staff worklists
 
 V0.12 implements the workforce workflow described in the September 2026 Medqur voice-note review.
@@ -124,7 +162,7 @@ Unknown medication packages remain unresolved rather than being guessed. Public/
 
 ## Prescription and signature workflow
 
-Doctors can create a prescription, select medication, dose, route, frequency, duration/instructions, choose blue or black pen styling, select a saved signature, preview the hospital prescription and print/share the resulting PDF.
+Doctors can create a prescription, select medication, controlled dose amount/unit, route, controlled frequency, duration/instructions, choose immediate or scheduled due time, choose blue or black pen styling, select a saved signature, preview the hospital prescription and print/share the resulting PDF.
 
 Photographed signatures are isolated from clean white paper and normalized onto prescription-safe white. A saved signature picture is not authentication by itself; prescription submissions remain bound to the authenticated staff account, facility, signing time and server-side SHA-256 attestation.
 
@@ -166,6 +204,16 @@ Production still requires authoritative external infrastructure for NIRA, Minist
 
 GitHub Actions is the release gate on `main` and validates the backend TypeScript/PostgreSQL foundation, Flutter analysis/tests, Android APK, web release/Pages and unsigned iOS build/package.
 
+V0.12.1 adds automated tests for:
+
+- dose amounts 1–100
+- dose-unit vocabulary
+- frequency counts 1x–10x
+- hour/day/week frequency periods
+- immediate and scheduled due modes
+- product-strength preset parsing without coercing out-of-range values
+- explicit 24-hour encounter time
+
 V0.12 adds automated tests for:
 
 - doctor prescribing/test-order permissions
@@ -178,6 +226,8 @@ V0.12 adds automated tests for:
 
 ## Repository structure
 
+- `lib/clinical_clock.dart` — explicit 24-hour clinical timestamp formatting
+- `lib/medication_order_options.dart` — controlled dose/frequency/due option model
 - `lib/clinical_models.dart` — workforce categories, support disciplines and diagnostic order/result models
 - `lib/screens/clinical_shell_v3.dart` — role-aware doctor/support/pharmacy application shell
 - `lib/screens/doctor_orders_hub_page.dart` — doctor prescriptions, investigations and results
