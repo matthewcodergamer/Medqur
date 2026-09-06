@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Medqur app icon</title>
+  <desc id="desc">Blue Medqur crown mark on a white background.</desc>
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <path d="M93 139 L93 383 Q93 414 124 414 L388 414 Q419 414 419 383 L419 139 Q419 108 395 108 L276 225 Q256 245 236 225 L117 108 Q93 108 93 139 Z"
+        fill="none" stroke="#3474E6" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
