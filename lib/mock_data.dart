@@ -29,7 +29,7 @@ const facilities = <Facility>[
 ];
 
 // Every health worker uses one stable six-digit Medqur staff number regardless
-// of profession, parish or facility. These are prototype identities only.
+// of profession, parish or facility. These are synthetic prototype identities.
 const demoDoctor = StaffProfile(
   id: '482731',
   name: 'Dr. Maya Brown',
@@ -56,6 +56,55 @@ const demoPharmacist = StaffProfile(
   registration: 'PHR-DEMO-2049',
   facilities: facilities,
 );
+
+// Clinical-support disciplines deliberately use the existing StaffRole.nurse
+// compatibility bucket while their title/registration resolves the exact
+// discipline. Production authorization comes from signed staff-role records.
+const demoRadiographer = StaffProfile(
+  id: '246810',
+  name: 'Alexis Clarke',
+  role: StaffRole.nurse,
+  title: 'Radiography Technologist',
+  registration: 'RAD-DEMO-3102',
+  facilities: facilities,
+);
+
+const demoCtTechnologist = StaffProfile(
+  id: '357912',
+  name: 'Jordan Blake',
+  role: StaffRole.nurse,
+  title: 'CT Technologist',
+  registration: 'CT-DEMO-4421',
+  facilities: facilities,
+);
+
+const demoLabTechnologist = StaffProfile(
+  id: '468135',
+  name: 'Naomi Lewis',
+  role: StaffRole.nurse,
+  title: 'Medical Laboratory Technologist',
+  registration: 'LAB-DEMO-8840',
+  facilities: facilities,
+);
+
+const demoEcgTechnician = StaffProfile(
+  id: '579246',
+  name: 'Samuel Grant',
+  role: StaffRole.nurse,
+  title: 'ECG Technician',
+  registration: 'ECG-DEMO-1934',
+  facilities: facilities,
+);
+
+const demoStaffProfiles = <StaffProfile>[
+  demoDoctor,
+  demoNurse,
+  demoPharmacist,
+  demoRadiographer,
+  demoCtTechnologist,
+  demoLabTechnologist,
+  demoEcgTechnician,
+];
 
 List<Patient> buildDemoPatients() => [
       Patient(
