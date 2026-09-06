@@ -4,6 +4,44 @@ Medqur is a Flutter clinical-workflow prototype for web, Android and iOS with a 
 
 > **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration.
 
+## V0.13 — responsive less-is-more clinical UX
+
+V0.13 turns responsiveness into a shared product rule rather than a collection of one-off screen fixes. The same workflow is expected to remain calm, readable and touch-safe from a 320 px phone to a 1440 px desktop browser.
+
+### Responsive foundation
+
+The app now has shared responsive primitives in `lib/widgets/medqur_responsive.dart`:
+
+- `MedqurResponsive` — common phone/tablet/desktop breakpoints and adaptive page padding
+- `ResponsiveFields` — form controls that stack before they become cramped
+- `ResponsiveActions` — action controls that become full-width rows on narrow screens
+- `ResponsiveGrid` — adaptive dashboard/card grids
+- `CompactHelperText` — capped secondary helper copy
+
+`MedqurPage`, `MedqurPageHeader`, `SoftCard`, `SectionTitle`, `StatusPill`, patient context, dashboard cards and the clinical shell now consume the shared layout rules rather than assuming a fixed phone or desktop width.
+
+### Less text, stronger hierarchy
+
+Normal workflow screens now favour the action and clinical context first. Secondary explanation is intentionally short and capped so a phone screen is not filled with paragraphs before the user reaches the control they need. Long standards/prototype explanations belong in Help/About or a dedicated detail surface.
+
+Critical clinical information is the exception: patient identity, acuity, allergy/safety status, medication, dose, route and timing must remain available even when secondary copy is reduced.
+
+### Phone, tablet and desktop behavior
+
+- narrow phones stack fields/actions before labels or menus can overflow
+- tiny screens reduce decorative or secondary elements rather than shrinking everything
+- tablets use compact grids where useful
+- desktop pages keep a readable maximum content width instead of stretching forms across the monitor
+- large desktop screens use the navigation rail; phone/tablet screens keep bottom navigation
+- facility selection and dashboard cards reflow into adaptive grids
+- top bars, status chips and headings use bounded text and overflow-safe layouts
+
+The standing responsive contract is documented in `docs/V0.13_RESPONSIVE_UX.md`.
+
+### Responsive regression tests
+
+Widget tests exercise representative widths of 320, 360, 390, 768, 1024 and 1440 px. Core layout primitives, the dashboard and facility picker are checked for Flutter layout exceptions/overflows so future changes cannot silently reintroduce phone-only or desktop-only breakage.
+
 ## V0.12.1 — structured medication directions and unambiguous encounter time
 
 V0.12.1 implements the follow-up September 2026 medication-order and timeline voice notes.
@@ -176,14 +214,19 @@ Photographed signatures are isolated from clean white paper and normalized onto 
 
 The interface follows the restrained Medqur design direction:
 
+- phone-first responsive layout with regression coverage down to 320 px
 - Inter-first typography with platform fallbacks
-- capped central content width
-- compact phone spacing and centered desktop/web layouts
+- capped central content width and useful whitespace on desktop
+- compact phone spacing and adaptive tablet/desktop grids
+- controls stack instead of squeezing or creating horizontal overflow
+- secondary helper copy is capped; detail uses progressive disclosure
 - white/light-neutral surfaces with dark navy text
 - blue mainly for actions
 - semantic green/amber/red only for safety/status/acuity
 - short, low-distraction transitions
 - no cartoon clinical workflow styling
+
+See `docs/V0.13_RESPONSIVE_UX.md` for the standing responsive contract.
 
 ## Backend/security foundation
 
@@ -203,6 +246,13 @@ Production still requires authoritative external infrastructure for NIRA, Minist
 ## Validation
 
 GitHub Actions is the release gate on `main` and validates the backend TypeScript/PostgreSQL foundation, Flutter analysis/tests, Android APK, web release/Pages and unsigned iOS build/package.
+
+V0.13 adds automated responsive checks for:
+
+- core cards/headers/forms at 320, 360, 390, 768, 1024 and 1440 px
+- dashboard reflow at phone, tablet and desktop widths
+- facility-picker reflow at phone, tablet and desktop widths
+- Flutter layout exceptions/overflow regressions in the tested surfaces
 
 V0.12.1 adds automated tests for:
 
@@ -226,10 +276,13 @@ V0.12 adds automated tests for:
 
 ## Repository structure
 
+- `lib/widgets/medqur_responsive.dart` — shared breakpoints, stacking, grids and compact helper text
+- `docs/V0.13_RESPONSIVE_UX.md` — standing responsive/less-is-more UX contract
+- `test/responsive_layout_test.dart` — multi-viewport layout regression tests
 - `lib/clinical_clock.dart` — explicit 24-hour clinical timestamp formatting
 - `lib/medication_order_options.dart` — controlled dose/frequency/due option model
 - `lib/clinical_models.dart` — workforce categories, support disciplines and diagnostic order/result models
-- `lib/screens/clinical_shell_v3.dart` — role-aware doctor/support/pharmacy application shell
+- `lib/screens/clinical_shell_v3.dart` — role-aware responsive doctor/support/pharmacy application shell
 - `lib/screens/doctor_orders_hub_page.dart` — doctor prescriptions, investigations and results
 - `lib/screens/clinical_worklist_page.dart` — clinical-support task routing
 - `lib/screens/clinical_order_composer_page.dart` — doctor test/procedure ordering
