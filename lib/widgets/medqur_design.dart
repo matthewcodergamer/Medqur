@@ -4,22 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import 'common.dart';
+import 'medqur_responsive.dart';
 
 abstract final class MedqurLayout {
-  static const compact = 600.0;
-  static const medium = 1000.0;
-  static const contentMax = 920.0;
+  static const compact = MedqurResponsive.phone;
+  static const medium = MedqurResponsive.tablet;
+  static const desktop = MedqurResponsive.desktop;
 
-  static EdgeInsets pagePadding(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    if (width < compact) {
-      return const EdgeInsets.fromLTRB(16, 18, 16, 28);
-    }
-    if (width < medium) {
-      return const EdgeInsets.fromLTRB(22, 22, 22, 32);
-    }
-    return const EdgeInsets.fromLTRB(26, 26, 26, 38);
-  }
+  static EdgeInsets pagePadding(BuildContext context) =>
+      MedqurResponsive.pagePadding(context);
 }
 
 class MedqurPage extends StatelessWidget {
@@ -28,21 +21,26 @@ class MedqurPage extends StatelessWidget {
     required this.children,
     this.controller,
     this.physics,
+    this.wide = false,
   });
 
   final List<Widget> children;
   final ScrollController? controller;
   final ScrollPhysics? physics;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: MedqurLayout.contentMax),
+        constraints: BoxConstraints(
+          maxWidth: MedqurResponsive.contentMax(context, wide: wide),
+        ),
         child: ListView(
           controller: controller,
           physics: physics,
           padding: MedqurLayout.pagePadding(context),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: children,
         ),
       ),
@@ -66,56 +64,76 @@ class MedqurPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < MedqurLayout.compact;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final phone = constraints.maxWidth < 560;
+        final tiny = constraints.maxWidth < 360;
+        final text = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (eyebrow != null) ...[
+              Text(
+                eyebrow!.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF7C8794),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .52,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+            Text(
+              title,
+              maxLines: phone ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontSize: tiny ? 20 : phone ? 22 : 26,
+                    letterSpacing: -.45,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+              const SizedBox(height: 5),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Text(
+                  subtitle!,
+                  maxLines: phone ? 2 : 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF697585),
+                        fontSize: phone ? 11.75 : 12.5,
+                        height: 1.3,
+                      ),
+                ),
+              ),
+            ],
+          ],
+        );
+
+        if (trailing == null) return text;
+        if (phone) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (eyebrow != null) ...[
-                Text(
-                  eyebrow!.toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF7C8794),
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .52,
-                  ),
-                ),
-                const SizedBox(height: 4),
-              ],
-              Text(
-                title,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: compact ? 22 : 26,
-                      letterSpacing: -.45,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 5),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 660),
-                  child: Text(
-                    subtitle!,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFF697585),
-                          fontSize: compact ? 12.25 : 12.75,
-                          height: 1.34,
-                        ),
-                  ),
-                ),
-              ],
+              text,
+              const SizedBox(height: 10),
+              Align(alignment: Alignment.centerLeft, child: trailing!),
             ],
-          ),
-        ),
-        if (trailing != null) ...[
-          const SizedBox(width: 12),
-          trailing!,
-        ],
-      ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: text),
+            const SizedBox(width: 14),
+            Flexible(child: trailing!),
+          ],
+        );
+      },
     );
   }
 }
@@ -140,92 +158,104 @@ class MedqurActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 330;
+        return Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: medqurLine),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F5F7),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: accent, size: 19),
+            onTap: onTap,
+            child: Container(
+              padding: EdgeInsets.all(narrow ? 11 : 13),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: medqurLine),
               ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              child: Row(
+                children: [
+                  Container(
+                    width: narrow ? 34 : 38,
+                    height: narrow ? 34 : 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F5F7),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: accent, size: narrow ? 18 : 19),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              color: medqurInk,
-                              fontSize: 13.75,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -.08,
-                            ),
-                          ),
-                        ),
-                        if (badge != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F5F7),
-                              borderRadius: BorderRadius.circular(99),
-                            ),
-                            child: Text(
-                              badge!,
-                              style: TextStyle(
-                                color: accent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: medqurInk,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -.08,
+                                ),
                               ),
                             ),
+                            if (badge != null && !narrow) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F5F7),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: Text(
+                                  badge!,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (!narrow) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF748091),
+                              fontSize: 11.25,
+                              height: 1.26,
+                            ),
                           ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF748091),
-                        fontSize: 11.5,
-                        height: 1.28,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFFA0A8B2),
+                    size: 19,
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFFA0A8B2),
-                size: 19,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -244,6 +274,7 @@ class MedqurMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(minHeight: 70),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -252,9 +283,12 @@ class MedqurMetric extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
                 fontSize: 19,
@@ -265,9 +299,11 @@ class MedqurMetric extends StatelessWidget {
             const SizedBox(height: 1),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFF748091),
-                fontSize: 10.75,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -283,82 +319,94 @@ class PatientContextBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allergy = patient.allergies.isEmpty
-        ? 'No known allergies recorded'
+        ? 'No known allergies'
         : patient.allergies.join(', ');
     final color = triageColor(patient.triage);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: medqurLine),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .065),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              triageCode(patient.triage),
-              style: TextStyle(
-                color: color,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tiny = constraints.maxWidth < 340;
+        return Container(
+          padding: EdgeInsets.all(tiny ? 10 : 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: medqurLine),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  patient.name,
-                  style: const TextStyle(
-                    color: medqurInk,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.75,
-                  ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .065),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${patient.age} • ${patient.sex} • ${patient.id}',
-                  style: const TextStyle(
-                    color: Color(0xFF748091),
-                    fontSize: 10.75,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Allergies: $allergy',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Text(
+                  triageCode(patient.triage),
                   style: TextStyle(
-                    color: patient.allergies.isEmpty
-                        ? const Color(0xFF748091)
-                        : medqurRed,
-                    fontSize: 10.75,
-                    fontWeight: patient.allergies.isEmpty
-                        ? FontWeight.w500
-                        : FontWeight.w700,
+                    color: color,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patient.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: medqurInk,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.75,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tiny
+                          ? '${patient.age} • ${patient.sex}'
+                          : '${patient.age} • ${patient.sex} • ${patient.id}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF748091),
+                        fontSize: 10.75,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Allergies: $allergy',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: patient.allergies.isEmpty
+                            ? const Color(0xFF748091)
+                            : medqurRed,
+                        fontSize: 10.75,
+                        fontWeight: patient.allergies.isEmpty
+                            ? FontWeight.w500
+                            : FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!tiny)
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 15,
+                  color: Color(0xFFA0A8B2),
+                ),
+            ],
           ),
-          const Icon(
-            Icons.lock_outline_rounded,
-            size: 15,
-            color: Color(0xFFA0A8B2),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
