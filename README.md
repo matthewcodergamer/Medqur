@@ -1,224 +1,202 @@
 # Medqur
 
-Medqur is a Flutter clinical-workflow prototype for web, Android and iOS, backed by a PostgreSQL/Node clinical-services layer. The project explores mobile-first patient identity, triage, secure workforce credentials, medication identification, prescribing, pharmacy, wristbands and point-of-care scanning in a Jamaican public-health setting.
+Medqur is a Flutter clinical-workflow prototype for web, Android and iOS with a PostgreSQL/Node service layer. The project explores Jamaican public-health patient identity, triage, secure staff credentials, prescribing, medication safety, pharmacy, clinical orders, diagnostic worklists, wristbands, printing and point-of-care scanning.
 
-> **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration. Production use requires formal governance, clinical validation, approved identity/data integrations, security review and deployment controls.
+> **Prototype / development system only.** This repository is not an official Ministry of Health & Wellness, NIRA, Regional Health Authority, e-Care/SystmOne or regulatory system. Do not use the public prototype with real protected health information or as the sole basis for diagnosis, treatment, identity verification, prescribing, dispensing or medication administration.
 
-## V0.11.3 — iPhone browser viewport and prescription-signature hardening
+## V0.12 — clinical orders and support-staff worklists
 
-V0.11.3 continues the V0.11.2 prescription and medication work, with two device-level fixes found during iPhone Safari testing: the web app no longer remains visually zoomed after text-field/keyboard interactions, and stored signatures are rendered on prescription-safe pure white instead of relying on transparent PNG compositing that could appear as a dark or grey block in some browser/PDF paths.
+V0.12 implements the workforce workflow described in the September 2026 Medqur voice-note review.
 
-### iPhone / Safari browser viewport fix
+### Responsibility model
 
-The generated Flutter web shell now writes a hardened mobile viewport specifically for iPhone/iPad browser use:
+- **Doctors** can open patient records, prescribe medication, create diagnostic/procedure orders, review returned results, assign patients and administer medication when clinically appropriate.
+- **Nurses / clinical support** can open patient records and read doctor orders. They cannot originate prescriptions or diagnostic orders. Work is routed according to discipline.
+- **Radiography / X-ray staff** receive X-ray orders and return the completed result.
+- **CT staff** receive CT orders.
+- **MRI staff** receive MRI orders.
+- **Laboratory staff** receive laboratory orders and return results.
+- **ECG staff** receive ECG/EKG orders. Registered nurses are also allowed to complete bedside ECG capture in the prototype workflow.
+- **Respiratory / ultrasound / other clinical-support roles** have their own routing categories.
+- **Pharmacy** remains separated from doctor ordering and clinical-support worklists. Pharmacists can access the patient information needed for prescription fulfilment and medication safety but cannot prescribe or originate diagnostic investigations.
 
-- `width=device-width` with a fixed initial scale and `viewport-fit=cover`;
-- 100% / dynamic-viewport sizing for the Flutter host rather than a stale visual viewport;
-- iOS text-size adjustment locked to 100%;
-- underlying browser editing controls held at 16px so Safari does not auto-zoom when a field receives focus;
-- a small runtime zoom guard that re-applies the viewport after focus/keyboard dismissal, page restoration and orientation changes;
-- a reset to the top-left visual origin after the iOS keyboard closes so the whole Flutter interface does not remain magnified or offset.
+All modeled workers still use a stable six-digit Medqur staff number. The existing Flutter `StaffRole` enum stays backward-compatible while the worker title/authoritative role resolves the more specific clinical discipline.
 
-The CI platform-generation step checks that these protections are actually present in the generated `web/index.html`, so a future Flutter template change cannot silently remove them.
+### Doctor Orders workspace
 
-### Prescription-template rendering fix
+The doctor workspace now combines:
 
-The supplied **Southern Regional Health Authority / Mandeville Regional Hospital** prescription sheet (`SRHA.MRH.CM2013`) remains the print base. Medqur does not substitute a cartoon/redrawn prescription for the hospital form.
+- new prescription
+- new test/procedure
+- open diagnostic orders
+- active medication orders
+- recently completed diagnostic results
 
-The compact embedded template is normalized at runtime into a standard four-channel RGBA PNG before it is given to Flutter or the PDF engine. This removes the browser/iOS decoder edge case that could show a plain grey rectangle instead of the prescription form. The same normalized bytes are used for the on-screen preview and generated PDF, and the rendering path is covered by automated image-decode tests.
+Supported diagnostic order types include X-ray, CT, MRI, ultrasound, laboratory, ECG/EKG, respiratory testing and a generic clinical investigation route. Each order includes patient/encounter, facility, study name, instructions, priority, requesting doctor, destination discipline and status.
 
-The preview overlays:
+### Clinical-support Worklist
 
-- patient name, sex, age and date
-- facility/clinic and discharge indicator
-- docket/patient ID
-- medicine and directions
-- copy number
-- doctor name
-- selected reusable doctor signature
+Clinical-support users now see a role-specific **Worklist** rather than the doctor prescription interface. Work is filtered/routed by discipline and keeps unrelated investigations read-only. Nursing users also continue to see medication-administration tasks.
 
-Patient/system fields use clean typed text. Medication directions use a restrained digital-pen appearance and can be rendered in blue or black ink.
+A routed order can move through:
 
-### Paper-signature extraction and rendering fix
+`Ordered → In progress → Completed`
 
-The paper-photo processor estimates paper brightness locally in small blocks rather than treating every dark pixel as signature ink. It detects blue-pen colour separately from neutral/black ink, requires meaningful local contrast, removes isolated camera noise, keeps softer edge pixels around real strokes and rejects captures that still resemble one large filled region.
+The performing worker can enter a structured result summary and attach an image/file from the phone camera or photo library.
 
-V0.11.3 adds a second rendering stage designed around the actual hospital form. After the signature strokes are isolated and cropped, Medqur composites the cleaned artwork onto **pure white paper** before storing/displaying a photographed signature. Because the prescription form itself is white, this safely blends into the form and avoids browser/PDF alpha-transparency failures that can turn transparent image data into one large block.
+For the prototype, this supports workflows such as photographing an existing paper ECG printout and attaching it to the encounter so the doctor can review it. Production X-ray/CT/MRI imaging should use approved PACS/DICOM integration or an approved clinical document/object store rather than photographing diagnostic images.
 
-Existing stored signatures are also normalized onto white at preview/print time. If an old stored image is overwhelmingly dark or does not resemble usable handwriting, Medqur displays a recapture warning rather than pasting the bad block onto the prescription. Printing is blocked until a usable signature is selected.
+### Diagnostic result persistence
 
-Doctors can create signatures by drawing with a finger/stylus or photographing a signature written on clean white paper. Multiple signatures, a preferred default, alternate selection, rename/delete controls and per-prescription SHA-256 attestations remain supported.
+The Flutter prototype persists diagnostic orders/results locally with `SharedPreferences` so the complete doctor → support worklist → result → doctor review loop works without external infrastructure.
 
-## Less-is-more design system
+The backend migration `006_clinical_orders_and_support_staff.sql` adds:
 
-The visual target remains restrained government/hospital software rather than a dense prototype or cartoon health app.
+- expanded clinical workforce role values
+- `diagnostic_orders`
+- `diagnostic_order_attachments`
+- discipline/status indexes
+- synthetic radiography, CT, laboratory and ECG demo workers
 
-- Preferred UI family: `Inter`, with platform fallbacks including SF Pro Text, Segoe UI, Roboto and Arial. No font binaries are bundled in the repository.
-- Central clinical content width is capped so desktop/web pages do not stretch across the screen.
-- Compact phone spacing, balanced tablet spacing and centered desktop/web layouts.
-- White/light-neutral surfaces with dark ink/navy typography.
-- Medqur blue is reserved mainly for primary actions; green, amber and red are reserved for verified/safety/acuity meaning.
-- Smaller shadows, corner radii, status pills, icons and headings.
-- Reduced motion with short fades/slides instead of decorative animation.
-- The medication capsule remains a low-risk browse motif only and uses the shorter, fuller shape introduced in V0.11.2.
+The attachment table limits individual prototype payloads to 3 MB. Production imaging must move to approved large-object/PACS storage.
 
-The sign-in page is intentionally simple: staff ID, primary authentication action, secure staff-QR scanning and optional prototype/demo access only where explicitly labeled.
+### Doctor medication administration
 
-## Workforce sign-in and device security
+Doctors are now explicitly allowed to administer medication in both the Flutter access policy and the backend authorization compatibility boundary. This does **not** turn doctors into a general nurse role; the backend exception is intentionally narrow to the existing nurse-only medication-administration endpoint.
 
-Every modeled health worker uses a unique **six-digit staff number**. Signed workforce QR credentials remain separate from person/device authentication.
+### Synthetic V0.12 staff
 
-### iPhone and iPad
+These identities are development fixtures only:
 
-The native app uses Flutter `local_auth` and the operating-system biometric prompt. When enrolled and supported, iOS uses **Face ID or Touch ID**. CI-generated iOS configuration adds the Face ID usage description required by iOS.
+| Staff ID | Role |
+|---|---|
+| `482731` | Medical Officer / doctor |
+| `615204` | Registered Nurse |
+| `739182` | Hospital Pharmacist |
+| `246810` | Radiography Technologist |
+| `357912` | CT Technologist |
+| `468135` | Medical Laboratory Technologist |
+| `579246` | ECG Technician |
 
-### Android
+The role-aware sign-in screen preserves native biometric authentication and the browser PIN boundary while allowing these synthetic identities to exercise the new workflow.
 
-Android uses the operating-system biometric prompt for an enrolled **fingerprint or supported face biometric**. CI adds `USE_BIOMETRIC` and uses `FlutterFragmentActivity`, as required by the native authentication plugin.
+## Staff authentication and security
 
-Medqur never receives a fingerprint or face template; the operating system returns only the authentication result.
+Every modeled health worker uses a unique six-digit staff number plus a separate machine-readable staff credential.
 
-### Browser prototype
+- **iOS native app:** Flutter `local_auth` uses the operating-system Face ID / Touch ID prompt when enrolled and supported.
+- **Android native app:** uses the operating-system fingerprint / supported biometric prompt.
+- **Browser prototype:** uses a six-digit local session PIN. This is only a prototype guard; production web authentication should use approved OIDC/WebAuthn/passkeys.
+- Signed workforce QR credentials identify the account; the QR is not treated as proof that the person holding the device is the employee.
 
-The public web build does not claim native Face ID/fingerprint authentication through Flutter `local_auth`. The browser fallback is a **six-digit local session PIN** with a random salt, salted SHA-256 verifier, constant-time comparison, and lockout after repeated failed attempts.
+## Patient and NIDS/NIC workflow
 
-The iPhone/iPad browser shell now includes the Safari viewport/keyboard protections described above so focusing fields does not leave the clinical workspace permanently zoomed or offset.
+The prototype supports:
 
-This PIN is a development guard, not production identity authentication. Production browser access should use an approved OIDC/WebAuthn relying party, preferably passkeys/security keys with server-issued challenges and government/Medqur identity policy.
+- NIDS/NIC test credential scanning
+- emergency / unknown-patient encounters
+- patient record and encounter persistence
+- P1–P4 clinician-entered triage
+- patient queues
+- patient wristband generation/scanning
+- patient files visible to authorized clinical/pharmacy staff
 
-## Prescription workflow
+The public prototype does not guess or reverse-engineer a production NIRA QR/API contract. A production system must use an authorized NIRA verification boundary.
 
-1. Select the patient encounter.
-2. Search the medication catalogue/registry or scan the package.
-3. Enter dose, route, frequency, duration and instructions.
-4. Optionally schedule the first dose.
-5. Choose blue or black prescription ink.
-6. Use the default saved signature or select an alternate signature.
-7. Sign and preview the completed hospital prescription.
-8. Print through the operating-system print service or save/share the PDF.
+## Medication, prescribing and pharmacy
 
-A saved signature picture is not authentication by itself. Every submitted prescription remains bound to the authenticated six-digit staff account, facility, role, time and audit record.
+Medication scanning supports common machine-readable package formats including GS1 DataMatrix, EAN/UPC, Code 128 and QR where applicable. The parser can extract/normalize GTIN, lot/batch, expiry/manufacture information and serial data when encoded.
 
-### Server-side prescription integrity
+The medication/pharmacy system includes:
 
-The `/v1/orders` service validates the prescription-signature boundary before storage. The server recomputes SHA-256 over the submitted signature payload, rejects mismatched digests, validates the payload and authenticated prescriber ID, checks signing time, persists the signature metadata and includes digest/method/version information in the audit event.
+- medication master and search
+- observed-package fixtures plus an explicitly unverified development catalogue
+- doctor prescriptions and reusable signature workflow
+- SRHA/Mandeville Regional Hospital prescription-form printing
+- pharmacy receiving, verification, lot/expiry inventory and dispensing
+- patient wristband + medication package checks
+- duplicate-dose/time-window protections
+- recall-impact queries
+- unit-dose DataMatrix generation when no suitable manufacturer unit code exists
+- FHIR-shaped Medication, MedicationRequest, MedicationDispense and MedicationAdministration resources
 
-A production deployment should additionally keep reusable signature assets in an encrypted server-side vault or hardware-backed device storage according to approved policy.
+Unknown medication packages remain unresolved rather than being guessed. Public/development catalogue data is not represented as an official Jamaica formulary.
 
-## Secure staff QR credentials
+## Prescription and signature workflow
 
-Medqur supports opaque signed staff credentials. Production-style QR credentials are designed so the QR itself does not expose the employee’s name, licence, profession, facility permissions or patient information.
+Doctors can create a prescription, select medication, dose, route, frequency, duration/instructions, choose blue or black pen styling, select a saved signature, preview the hospital prescription and print/share the resulting PDF.
 
-The identity service can check credential signature, expiry, revocation, active staff account, current role and authorized facility. The badge identifies the account; device biometric/passkey authentication verifies the person using the device.
-
-Current development fixtures are synthetic and are not an official healthcare-worker registry.
-
-## NIDS / NIC workflow
-
-The app supports camera scanning and a Medqur **test-only** NIDS credential loop for synthetic patient-registration testing. A test QR can prefill fictional name/date-of-birth/test NIN information.
-
-Unknown/opaque NIC data can be captured and fingerprinted, but Medqur does not label a real Jamaican NIC as verified without an authorized NIRA verification boundary. The public repository does not guess or reverse-engineer a production NIRA QR/API contract.
-
-A production flow should use NIRA-approved identity verification and return only the minimum authorized identity attributes needed for patient matching.
-
-## Medication identification, search and pharmacy
-
-Medication scanning accepts supported real package formats including GS1 DataMatrix, EAN/UPC, Code 128 and QR where applicable. The parser can extract/normalize GTIN, lot/batch, manufacture/best-before/expiry dates and serial information when encoded.
-
-Resolution is trust-aware: configured medication registry/master first, then local cache/observed package data and public reference data where appropriate, with pharmacist verification when unresolved. Unknown products remain unknown rather than being guessed.
-
-The **unverified development catalogue** lets prescription/search screens exercise realistic forms and therapeutic categories while an authoritative Jamaica feed is unavailable. Development fixtures include, among others, paracetamol, amoxicillin, amoxicillin/clavulanic acid, ibuprofen, azithromycin, doxycycline, ceftriaxone, metformin, amlodipine, lisinopril, omeprazole, cetirizine, salbutamol, fluconazole and oral rehydration salts, in addition to observed-package scanner fixtures.
-
-These added rows are explicitly `unreviewed` / `unverified`, use `medqur_prototype_catalogue` provenance and are **not** represented as Jamaica-approved products or prescribing recommendations.
-
-The PostgreSQL pharmacy backend supports medication products/identifiers/ingredients, receiving, lot/expiry inventory, product verification, dispensing, recall-impact queries, administration records, unit-dose DataMatrix labels, audit/outbox events, signed offline catalog releases and FHIR-shaped medication endpoints.
-
-## Triage and patient workflow
-
-- P1–P4 clinician-entered triage categories.
-- NIDS/NIC test scan or emergency/unknown patient registration.
-- Editable patient identity/encounter state.
-- Patient wristband generation and scanning.
-- Patient queue ordered by acuity.
-- Doctor order/prescription workflow.
-- Pharmacy and nurse medication-task workflow.
-- Closed-loop patient-wristband + medication-package checks.
-- Local prototype persistence and an integration boundary for realtime/backend synchronization.
-
-The prototype does not automatically diagnose a patient or assign a triage priority from symptoms alone.
+Photographed signatures are isolated from clean white paper and normalized onto prescription-safe white. A saved signature picture is not authentication by itself; prescription submissions remain bound to the authenticated staff account, facility, signing time and server-side SHA-256 attestation.
 
 ## Printing
 
-### Wristbands
+- Patient wristbands: dynamic PDF → system print service → configured printer.
+- Prescriptions: dynamic SRHA/MRH form → system print service / save PDF.
+- Future production path: facility Print Bridge plus Zebra healthcare wristband/label adapters.
 
-The prototype generates a dynamic wristband PDF and opens the system print service. A future facility Print Bridge/Zebra adapter can route jobs directly to configured healthcare wristband printers.
+## Less-is-more clinical UI
 
-### Prescriptions
+The interface follows the restrained Medqur design direction:
 
-Medqur generates the SRHA/MRH prescription form as a print-ready PDF with dynamic patient/prescriber information, medication directions and the selected stored signature. The prescription image is normalized for Flutter/PDF rendering, and photographed signatures are flattened onto pure white before being inserted into the white hospital form.
+- Inter-first typography with platform fallbacks
+- capped central content width
+- compact phone spacing and centered desktop/web layouts
+- white/light-neutral surfaces with dark navy text
+- blue mainly for actions
+- semantic green/amber/red only for safety/status/acuity
+- short, low-distraction transitions
+- no cartoon clinical workflow styling
 
-A production deployment must validate legal/clinical requirements for electronic/printed prescriptions, signature policy, controlled medicines and pharmacy acceptance before use.
+## Backend/security foundation
 
-## Backend and security boundaries
+The Node/TypeScript/PostgreSQL layer includes:
 
-The Node/TypeScript/PostgreSQL backend includes:
+- OIDC/JWT authorization boundary
+- facility-scoped role assignments
+- six-digit workforce identities and signed badge credentials
+- medication master, pharmacy and inventory tables
+- diagnostic order/result schema
+- append-only audit events and outbox/realtime patterns
+- signed prescription integrity checks
+- signed/versioned offline medication catalogue support
 
-- role/facility authorization boundaries
-- medication master and pharmacy tables
-- append-only audit/event patterns
-- realtime event-stream boundary
-- signed staff credential service
-- signed/versioned medication catalog support
-- FHIR-shaped medication resources
-- prescription-signature database integrity constraints
-- server-side prescription signature digest and signer verification
+Production still requires authoritative external infrastructure for NIRA, Ministry/RHA workforce identity, OIDC/passkeys, e-Care/SystmOne, PACS/DICOM, medication/formulary/regulatory feeds and approved structured allergy/interaction knowledge.
 
-Production still requires authorized external infrastructure for NIRA, Ministry/RHA workforce identity, OIDC/passkeys, e-Care/SystmOne, authoritative Jamaican medication/formulary/regulatory feeds and approved drug-interaction/allergy knowledge.
+## Validation
 
-## Build and validation
+GitHub Actions is the release gate on `main` and validates the backend TypeScript/PostgreSQL foundation, Flutter analysis/tests, Android APK, web release/Pages and unsigned iOS build/package.
 
-GitHub Actions is the release gate on `main` and performs backend TypeScript validation, PostgreSQL schema startup, medication-registry/staff-ID smoke tests, Flutter analysis/tests, Android APK build, web release/Pages publication and unsigned iOS build/package.
+V0.12 adds automated tests for:
 
-V0.11.3 validates the full-width MRH form, signature extraction under uneven paper lighting, signature white-paper compositing, medication identification/safety behavior and the generated iPhone web-shell viewport protections.
-
-Local Flutter development:
-
-```bash
-flutter pub get
-flutter run
-```
-
-Build examples:
-
-```bash
-flutter build apk --release
-flutter build web --release --base-href "/Medqur/"
-flutter build ios --release --no-codesign
-```
-
-The unsigned iOS artifact is only build validation; normal iPhone distribution requires Apple code signing/provisioning or TestFlight/App Store deployment.
+- doctor prescribing/test-order permissions
+- doctor medication administration permission
+- nurse/support restrictions
+- discipline-routed diagnostic work
+- pharmacist restrictions
+- diagnostic-order serialization
+- diagnostic attachment persistence
 
 ## Repository structure
 
-- `lib/screens/` — clinical, pharmacy, scan, identity and prescription workflows
-- `lib/services/` — medication registry, pharmacy API, NIDS, biometric/browser session guards, persistence, signature vault/rendering and print generation
-- `lib/widgets/` — shared design system, scanner helpers, signature pad and prescription-form preview
-- `lib/generated/prescription_template_data.dart` — embedded/normalized MRH prescription form
-- `backend/sql/005_prototype_medication_catalog.sql` — expanded unverified development medication seed
-- `backend/` — PostgreSQL/Node medication, pharmacy, identity, audit and FHIR-shaped service layer
-- `.github/workflows/build.yml` — cross-platform CI/release validation
+- `lib/clinical_models.dart` — workforce categories, support disciplines and diagnostic order/result models
+- `lib/screens/clinical_shell_v3.dart` — role-aware doctor/support/pharmacy application shell
+- `lib/screens/doctor_orders_hub_page.dart` — doctor prescriptions, investigations and results
+- `lib/screens/clinical_worklist_page.dart` — clinical-support task routing
+- `lib/screens/clinical_order_composer_page.dart` — doctor test/procedure ordering
+- `lib/screens/clinical_order_detail_page.dart` — task execution/result upload/review
+- `lib/services/clinical_order_store.dart` — local prototype persistence
+- `backend/sql/006_clinical_orders_and_support_staff.sql` — server data model and workforce roles
+- `backend/` — identity, medication, pharmacy, audit and interoperability services
 
-## Next production stages
+## Next production integrations
 
-- server-side encrypted reusable-signature vault synchronization and retention policy
-- authoritative Jamaica medication/formulary/regulatory feed
-- approved structured drug-allergy/interaction knowledge base
-- production OIDC/WebAuthn/passkey sessions and managed-device policy
-- NIRA test/production integration under authorized specifications
+- synchronize diagnostic orders/results through authenticated backend endpoints
+- PACS/DICOM imaging integration for X-ray/CT/MRI
+- approved laboratory/LIS interface
+- structured ECG device/digital report interface
+- production workforce directory for all support disciplines
 - e-Care/SystmOne integration under Ministry/vendor-approved interfaces
-- realtime multi-device patient/order/pharmacy synchronization
-- offline conflict-safe medication workflows
-- Print Bridge plus Zebra healthcare wristband/label integration
-- accessibility, usability and clinical human-factors validation
+- conflict-safe offline/realtime synchronization
+- accessibility and formal clinical human-factors validation
 
-Medqur’s architecture intentionally keeps external authoritative integrations behind adapters so the public prototype does not impersonate an official government service.
+Medqur keeps authoritative external systems behind adapters so the public prototype does not impersonate an official government system.
