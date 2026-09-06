@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'mock_data.dart';
 import 'models.dart';
-import 'screens/clinical_shell_v2.dart';
+import 'screens/clinical_shell_v3.dart';
 import 'screens/facility_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'services/patient_store.dart';
@@ -297,20 +297,20 @@ class _MedqurAppState extends State<MedqurApp> {
     }
     if (_staff == null) {
       return SignInScreen(
-        key: const ValueKey('signin-v5'),
+        key: const ValueKey('signin-v6'),
         onSignedIn: (staff) => setState(() => _staff = staff),
       );
     }
     if (_facility == null) {
       return FacilityScreen(
-        key: const ValueKey('facility-v5'),
+        key: const ValueKey('facility-v6'),
         staff: _staff!,
         onBack: () => setState(() => _staff = null),
         onStartShift: (facility) => setState(() => _facility = facility),
       );
     }
-    return ClinicalShellV2(
-      key: const ValueKey('shell-v5'),
+    return ClinicalShellV3(
+      key: const ValueKey('shell-v6'),
       staff: _staff!,
       facility: _facility!,
       patients: _patients!,
