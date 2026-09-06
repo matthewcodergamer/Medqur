@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+
 import '../models.dart';
 import '../widgets/common.dart';
+import '../widgets/medqur_responsive.dart';
 import 'facility_directory_page.dart';
 
 class FacilityScreen extends StatefulWidget {
-  const FacilityScreen({super.key, required this.staff, required this.onBack, required this.onStartShift});
+  const FacilityScreen({
+    super.key,
+    required this.staff,
+    required this.onBack,
+    required this.onStartShift,
+  });
+
   final StaffProfile staff;
   final VoidCallback onBack;
   final ValueChanged<Facility> onStartShift;
@@ -31,157 +39,245 @@ class _FacilityScreenState extends State<FacilityScreen> {
       (f) => f.suggested,
       orElse: () => widget.staff.facilities.first,
     );
+    final phone = MedqurResponsive.isPhone(context);
+    final tiny = MedqurResponsive.isTiny(context);
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
+            constraints: const BoxConstraints(maxWidth: 1040),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: MedqurResponsive.pagePadding(context),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(children: [
-                    IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back_rounded)),
-                    const Spacer(),
-                    const MedqurLogo(width: 150),
-                  ]),
-                  const SizedBox(height: 34),
-                  Text('Welcome, ${widget.staff.name}', style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Choose where you are working today. Medqur now carries Jamaica’s hospital A/B/C and health-centre Type 1–5 classifications with the facility context.',
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: widget.onBack,
+                        tooltip: 'Back',
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                      const Spacer(),
+                      MedqurLogo(width: tiny ? 105 : 135),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  SoftCard(
-                    highlighted: true,
-                    child: Row(children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: medqurBlue.withValues(alpha: .10),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: const Icon(Icons.near_me_rounded, color: medqurBlue),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text(
-                            'Suggested location',
-                            style: TextStyle(color: medqurBlue, fontSize: 12, fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            suggested.name,
-                            style: const TextStyle(fontWeight: FontWeight.w800, color: medqurInk),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${suggested.classificationLabel} • ${suggested.area}',
-                            style: const TextStyle(color: Color(0xFF748297), fontSize: 13),
-                          ),
-                        ]),
-                      ),
-                      const Icon(Icons.verified_rounded, color: medqurGreen),
-                    ]),
+                  SizedBox(height: phone ? 22 : 30),
+                  Text(
+                    'Welcome, ${widget.staff.name}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Choose your facility for this shift.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF697585),
+                      fontSize: 12.5,
+                    ),
                   ),
                   const SizedBox(height: 18),
+                  SoftCard(
+                    highlighted: true,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final narrow = constraints.maxWidth < 390;
+                        return Row(
+                          children: [
+                            Container(
+                              width: narrow ? 42 : 48,
+                              height: narrow ? 42 : 48,
+                              decoration: BoxDecoration(
+                                color: medqurBlue.withValues(alpha: .10),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.near_me_rounded,
+                                color: medqurBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Suggested',
+                                    style: TextStyle(
+                                      color: medqurBlue,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    suggested.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: medqurInk,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${suggested.classification.shortLabel} • ${suggested.area}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF748297),
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!narrow)
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: medqurGreen,
+                                size: 20,
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const FacilityDirectoryPage()),
-                    ),
-                    icon: const Icon(Icons.account_tree_outlined),
-                    label: const Text('Browse Jamaica public facility directory'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 52),
-                      foregroundColor: medqurInk,
-                      side: const BorderSide(color: medqurLine),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const SectionTitle('Authorized facilities'),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'The directory is informational. Starting a shift remains limited to facilities authorized for this staff profile.',
-                    style: TextStyle(color: Color(0xFF748297), fontSize: 12, height: 1.35),
-                  ),
-                  const SizedBox(height: 12),
-                  ...widget.staff.facilities.map(
-                    (facility) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: SoftCard(
-                        highlighted: selected?.id == facility.id,
-                        onTap: () => setState(() => selected = facility),
-                        child: Row(children: [
-                          Container(
-                            width: 54,
-                            height: 54,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: facility.isHealthCentre
-                                  ? medqurGreen.withValues(alpha: .10)
-                                  : medqurBlue.withValues(alpha: .10),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(
-                                facility.isHealthCentre ? Icons.local_hospital_outlined : Icons.apartment_rounded,
-                                size: 21,
-                                color: facility.isHealthCentre ? medqurGreen : medqurBlue,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                facility.classification.shortLabel,
-                                style: TextStyle(
-                                  color: facility.isHealthCentre ? medqurGreen : medqurBlue,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ]),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(
-                                facility.name,
-                                style: const TextStyle(fontWeight: FontWeight.w800, color: medqurInk, fontSize: 15),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${facility.classificationLabel} • ${facility.area}',
-                                style: const TextStyle(color: Color(0xFF748297), fontSize: 13),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                facility.careLevel,
-                                style: const TextStyle(color: Color(0xFF8793A4), fontSize: 11, fontWeight: FontWeight.w700),
-                              ),
-                            ]),
-                          ),
-                          Radio<String>(
-                            value: facility.id,
-                            groupValue: selected?.id,
-                            onChanged: (_) => setState(() => selected = facility),
-                          ),
-                        ]),
+                      MaterialPageRoute(
+                        builder: (_) => const FacilityDirectoryPage(),
                       ),
                     ),
+                    icon: const Icon(Icons.account_tree_outlined),
+                    label: Text(phone ? 'Facility directory' : 'Browse public facility directory'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 22),
+                  const SectionTitle('Authorized facilities'),
+                  const SizedBox(height: 5),
+                  const CompactHelperText(
+                    'Only facilities assigned to this staff profile can start a shift.',
+                    maxLinesPhone: 2,
+                  ),
+                  const SizedBox(height: 11),
+                  ResponsiveGrid(
+                    minItemWidth: 310,
+                    maxColumns: 2,
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final facility in widget.staff.facilities)
+                        _FacilityChoice(
+                          facility: facility,
+                          selected: selected?.id == facility.id,
+                          onTap: () => setState(() => selected = facility),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
                   FilledButton.icon(
-                    onPressed: selected == null ? null : () => widget.onStartShift(selected!),
+                    onPressed: selected == null
+                        ? null
+                        : () => widget.onStartShift(selected!),
                     icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text(selected == null ? 'Select a facility' : 'Start shift at ${selected!.name}'),
+                    label: Text(
+                      selected == null
+                          ? 'Select a facility'
+                          : phone
+                              ? 'Start shift'
+                              : 'Start shift at ${selected!.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FacilityChoice extends StatelessWidget {
+  const _FacilityChoice({
+    required this.facility,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Facility facility;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = facility.isHealthCentre ? medqurGreen : medqurBlue;
+    return SoftCard(
+      highlighted: selected,
+      onTap: onTap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: .09),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(
+              facility.isHealthCentre
+                  ? Icons.local_hospital_outlined
+                  : Icons.apartment_rounded,
+              size: 20,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  facility.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: medqurInk,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${facility.classification.shortLabel} • ${facility.area}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF748297),
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            selected
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_off_rounded,
+            color: selected ? medqurBlue : const Color(0xFFA0A8B2),
+            size: 21,
+          ),
+        ],
       ),
     );
   }
