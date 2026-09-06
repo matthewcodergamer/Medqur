@@ -98,19 +98,47 @@ void main() {
       );
     });
 
-    test('common instructions include voice-note safety examples', () {
+    test('duration dropdown includes short, course and long-term choices', () {
+      expect(MedicationPrescribingOptions.durations.first, 'Not specified');
+      expect(
+        MedicationPrescribingOptions.durations,
+        containsAll(<String>[
+          'Single dose',
+          '1 day',
+          '7 days',
+          '14 days',
+          '30 days',
+          '6 weeks',
+          '3 months',
+          'Until course completed',
+          'Until reviewed',
+          'Ongoing',
+        ]),
+      );
+    });
+
+    test('instruction library is broad and covers common food/drink warnings', () {
+      expect(
+        MedicationPrescribingOptions.commonInstructions.length,
+        greaterThanOrEqualTo(70),
+      );
       expect(
         MedicationPrescribingOptions.commonInstructions,
         containsAll(<String>[
           'Avoid alcohol',
-          'May cause drowsiness',
-          'Do not drive or operate machinery if drowsy',
+          'Avoid grapefruit and grapefruit juice',
+          'Avoid tea and coffee within 2 hours of this dose',
+          'Avoid milk and dairy products around the time of this dose',
+          'Do not take with milk',
+          'Take with milk',
           'Take with food',
           'Take before food',
           'Take on an empty stomach',
-          'Take with milk',
-          'Do not take with milk',
           'Take with water',
+          'May cause drowsiness',
+          'Do not drive or operate machinery if drowsy, dizzy or vision is affected',
+          'Avoid using antacids within 2 hours of this dose',
+          'Rinse mouth after each inhaled dose',
         ]),
       );
     });
