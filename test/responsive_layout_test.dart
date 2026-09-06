@@ -158,6 +158,7 @@ void main() {
               patients: buildDemoPatients(),
               diagnosticOrders: const [],
               onOpenPatient: (_) {},
+              onOpenMedicationOrder: (_, __) {},
               onCreatePrescription: () {},
               onCreateDiagnosticOrder: () {},
               onOpenDiagnosticOrder: (_) {},
