@@ -1,1 +1,1 @@
-export 'pharmacy_page_v2.dart';
+export 'pharmacy_page_compat.dart';
