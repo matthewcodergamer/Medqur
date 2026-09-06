@@ -9,6 +9,14 @@ export type MedqurRole =
   | 'triage_nurse'
   | 'pharmacist'
   | 'pharmacy_technician'
+  | 'radiology_technologist'
+  | 'ct_technologist'
+  | 'mri_technologist'
+  | 'lab_technologist'
+  | 'ecg_technician'
+  | 'respiratory_therapist'
+  | 'sonographer'
+  | 'clinical_support'
   | 'administrator';
 
 export interface AuthContext {
