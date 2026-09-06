@@ -5,6 +5,7 @@ import '../models.dart';
 import '../services/access_policy.dart';
 import '../widgets/common.dart';
 import '../widgets/medqur_design.dart';
+import '../widgets/medqur_responsive.dart';
 
 class ClinicalWorklistPage extends StatelessWidget {
   const ClinicalWorklistPage({
@@ -44,12 +45,12 @@ class ClinicalWorklistPage extends StatelessWidget {
       });
 
     return MedqurPage(
+      wide: true,
       children: [
         MedqurPageHeader(
           eyebrow: 'Clinical support',
           title: 'Worklist',
-          subtitle:
-              '${staff.clinicalDiscipline.label} • orders and patient tasks routed from the clinical team.',
+          subtitle: staff.clinicalDiscipline.label,
           trailing: StatusPill(
             label: '${medicationTasks.length + openOrders.length} open',
             color: medicationTasks.isEmpty && openOrders.isEmpty
@@ -59,51 +60,24 @@ class ClinicalWorklistPage extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         if (medicationTasks.isNotEmpty) ...[
-          SectionTitle('Medication administration'),
+          const SectionTitle('Medication administration'),
           const SizedBox(height: 10),
-          for (final task in medicationTasks)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: SoftCard(
-                padding: const EdgeInsets.all(14),
-                onTap: () => onOpenPatient(task.patient),
-                child: Row(
-                  children: [
-                    const Icon(Icons.medication_outlined,
-                        color: medqurBlue, size: 22),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            task.patient.name,
-                            style: const TextStyle(
-                              color: medqurInk,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${task.medication.name} ${task.medication.dose} • ${task.medication.route}',
-                            style: const TextStyle(
-                              color: Color(0xFF687587),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: Color(0xFF9AA4B1)),
-                  ],
+          ResponsiveGrid(
+            minItemWidth: 320,
+            maxColumns: 2,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final task in medicationTasks)
+                _MedicationTaskCard(
+                  task: task,
+                  onTap: () => onOpenPatient(task.patient),
                 ),
-              ),
-            ),
-          const SizedBox(height: 12),
+            ],
+          ),
+          const SizedBox(height: 20),
         ],
-        SectionTitle('Tests & procedures'),
+        const SectionTitle('Tests & procedures'),
         const SizedBox(height: 10),
         if (openOrders.isEmpty)
           const SoftCard(
@@ -116,71 +90,21 @@ class ClinicalWorklistPage extends StatelessWidget {
             ),
           )
         else
-          for (final order in openOrders)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: SoftCard(
-                padding: const EdgeInsets.all(14),
-                onTap: () => onOpenOrder(order),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _orderIcon(order.type),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  order.studyName,
-                                  style: const TextStyle(
-                                    color: medqurInk,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              StatusPill(
-                                label: order.priority.label,
-                                color: order.priority == DiagnosticOrderPriority.stat
-                                    ? medqurRed
-                                    : order.priority == DiagnosticOrderPriority.urgent
-                                        ? medqurAmber
-                                        : medqurBlue,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${order.patientId} • ${order.assignedDiscipline.label}',
-                            style: const TextStyle(
-                              color: Color(0xFF748094),
-                              fontSize: 10.5,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            AccessPolicy.canWorkOnDiagnosticOrder(staff, order)
-                                ? 'Tap to perform and upload result'
-                                : 'Read only — routed to another discipline',
-                            style: TextStyle(
-                              color: AccessPolicy.canWorkOnDiagnosticOrder(staff, order)
-                                  ? medqurGreen
-                                  : const Color(0xFF8A96A6),
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          ResponsiveGrid(
+            minItemWidth: 330,
+            maxColumns: 2,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final order in openOrders)
+                _OrderCard(
+                  order: order,
+                  staff: staff,
+                  icon: _orderIcon(order.type),
+                  onTap: () => onOpenOrder(order),
                 ),
-              ),
-            ),
+            ],
+          ),
       ],
     );
   }
@@ -212,6 +136,170 @@ class ClinicalWorklistPage extends StatelessWidget {
         DiagnosticOrderPriority.urgent => 2,
         DiagnosticOrderPriority.stat => 3,
       };
+}
+
+class _MedicationTaskCard extends StatelessWidget {
+  const _MedicationTaskCard({required this.task, required this.onTap});
+
+  final _MedicationTask task;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SoftCard(
+        onTap: onTap,
+        child: Row(
+          children: [
+            const Icon(Icons.medication_outlined, color: medqurBlue, size: 22),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.patient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: medqurInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${task.medication.name} ${task.medication.dose}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF687587),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    task.medication.route,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF7B8796),
+                      fontSize: 10.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF9AA4B1),
+            ),
+          ],
+        ),
+      );
+}
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({
+    required this.order,
+    required this.staff,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final DiagnosticOrder order;
+  final StaffProfile staff;
+  final Widget icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final canWork = AccessPolicy.canWorkOnDiagnosticOrder(staff, order);
+    final priorityColor = order.priority == DiagnosticOrderPriority.stat
+        ? medqurRed
+        : order.priority == DiagnosticOrderPriority.urgent
+            ? medqurAmber
+            : medqurBlue;
+
+    return SoftCard(
+      onTap: onTap,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 315;
+          final priority = StatusPill(
+            label: order.priority.label,
+            color: priorityColor,
+          );
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              icon,
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (narrow) ...[
+                      Text(
+                        order.studyName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: medqurInk,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      priority,
+                    ] else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              order.studyName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: medqurInk,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          priority,
+                        ],
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      order.assignedDiscipline.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF748094),
+                        fontSize: 10.5,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      canWork ? 'Open task' : 'Read only',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: canWork ? medqurGreen : const Color(0xFF8A96A6),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _MedicationTask {
