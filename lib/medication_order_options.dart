@@ -92,7 +92,7 @@ class StructuredMedicationDirections {
 
   String get doseText => '$doseValue ${doseUnit.symbol}';
 
-  String get frequencyText => '$frequencyCount× per ${frequencyPeriod.label}';
+  String get frequencyText => '${frequencyCount}x per ${frequencyPeriod.label}';
 
   DateTime effectiveDueAt({DateTime? now}) {
     if (dueMode == MedicationDueMode.immediate) {
