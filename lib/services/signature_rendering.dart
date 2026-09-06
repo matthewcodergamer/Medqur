@@ -4,30 +4,10 @@ import 'package:image/image.dart' as img;
 
 /// Produces prescription-safe signature artwork.
 abstract final class SignatureRendering {
-  /// Composites transparency onto pure white without changing the source ink.
-  static Uint8List onWhitePaper(Uint8List sourceBytes) {
-    final decoded = img.decodeImage(sourceBytes);
-    if (decoded == null) return sourceBytes;
-    final source = img.bakeOrientation(decoded);
-    final output = img.Image(
-      width: source.width,
-      height: source.height,
-      numChannels: 4,
-    );
-
-    for (var y = 0; y < source.height; y++) {
-      for (var x = 0; x < source.width; x++) {
-        final pixel = source.getPixel(x, y);
-        final alpha = pixel.a.toDouble() / 255.0;
-        final red = (pixel.r * alpha + 255 * (1 - alpha)).round();
-        final green = (pixel.g * alpha + 255 * (1 - alpha)).round();
-        final blue = (pixel.b * alpha + 255 * (1 - alpha)).round();
-        output.setPixelRgba(x, y, red, green, blue, 255);
-      }
-    }
-
-    return Uint8List.fromList(img.encodePng(output, level: 8));
-  }
+  /// Prescription-safe output is blue-only in V0.14. The compatibility method
+  /// remains so older call sites automatically receive the same blue rendering.
+  static Uint8List onWhitePaper(Uint8List sourceBytes) =>
+      blueInkOnWhitePaper(sourceBytes);
 
   /// Normalizes old black signatures and new photo/drawn signatures to one
   /// prescription-blue appearance on white paper. This keeps legacy saved
