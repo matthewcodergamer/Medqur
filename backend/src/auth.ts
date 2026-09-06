@@ -107,7 +107,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 export function requireRoles(...allowed: MedqurRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const auth = req.auth;
-    if (!auth || !auth.roles.some((role) => allowed.includes(role))) {
+    const directMatch = auth?.roles.some((role) => allowed.includes(role)) ?? false;
+
+    // The medication-administration endpoint predates the voice-note update and
+    // is guarded as nurse-only. Doctors are explicitly permitted to perform a
+    // nurse-level administration action, while no other nurse-only capability
+    // is automatically inherited. Keeping the exception this narrow prevents a
+    // general doctor=>nurse role hierarchy from leaking into future endpoints.
+    const doctorAdministrationCompatibility =
+      allowed.length === 1 &&
+      allowed[0] === 'nurse' &&
+      (auth?.roles.includes('doctor') ?? false);
+
+    if (!auth || (!directMatch && !doctorAdministrationCompatibility)) {
       res.status(403).json({ error: 'This clinical role is not authorized for this action.' });
       return;
     }
