@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../clinical_clock.dart';
+import '../medication_order_options.dart';
 import '../models.dart';
 import '../services/access_policy.dart';
 import '../services/medication_identifier.dart';
@@ -51,16 +53,9 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
     return widget.staff.facilities.isEmpty ? 'MRH' : widget.staff.facilities.first.id;
   }
 
-  String _timeNow() {
-    final now = TimeOfDay.now();
-    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-  }
+  String _timeNow() => ClinicalClock.time(DateTime.now());
 
-  String _formatDateTime(DateTime value) {
-    final local = value.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-  }
+  String _formatDateTime(DateTime value) => ClinicalClock.dateTime(value);
 
   bool _uuid(String? value) => value != null &&
       RegExp(
@@ -118,9 +113,12 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
   Future<void> _addOrder() async {
     if (!canOrder) return;
     final medication = TextEditingController();
-    final dose = TextEditingController();
+    int doseValue = 1;
+    MedicationDoseUnit doseUnit = MedicationDoseUnit.milligram;
     String route = 'Oral';
-    String frequency = 'Once';
+    int frequencyCount = 1;
+    MedicationFrequencyPeriod frequencyPeriod = MedicationFrequencyPeriod.day;
+    MedicationDueMode dueMode = MedicationDueMode.immediate;
     String? productCode;
     MedicationIdentifier? productIdentifier;
     MedicationResolution? resolution;
@@ -133,6 +131,13 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
       showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
+          void applyStrength(String strength) {
+            final preset = MedicationDosePreset.tryParse(strength);
+            if (preset == null) return;
+            doseValue = preset.value;
+            doseUnit = preset.unit;
+          }
+
           Future<void> scanPackage() async {
             final capture = await Navigator.of(sheetContext).push<ScanCapture>(
               MaterialPageRoute(
@@ -161,20 +166,30 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
               if (product != null && medication.text.trim().isEmpty) {
                 medication.text = product.genericName;
               }
-              if (product != null && dose.text.trim().isEmpty) {
-                dose.text = product.strength;
-              }
+              if (product != null) applyStrength(product.strength);
             });
           }
 
           Future<void> chooseSchedule() async {
             final selected = await _pickSchedule(sheetContext, scheduledAt);
             if (!sheetContext.mounted) return;
-            setSheetState(() => scheduledAt = selected);
+            setSheetState(() {
+              dueMode = MedicationDueMode.scheduled;
+              scheduledAt = selected;
+            });
           }
 
           final product = resolution?.product;
           final verified = resolution?.approvedForClinicalAutomation == true;
+          final directions = StructuredMedicationDirections(
+            doseValue: doseValue,
+            doseUnit: doseUnit,
+            frequencyCount: frequencyCount,
+            frequencyPeriod: frequencyPeriod,
+            dueMode: dueMode,
+            scheduledAt: scheduledAt,
+          );
+
           return SafeArea(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
@@ -207,13 +222,49 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: dose,
-                      decoration: const InputDecoration(
-                        labelText: 'Dose',
-                        hintText: 'e.g. 1 g',
-                        prefixIcon: Icon(Icons.straighten_rounded),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: doseValue,
+                            decoration:
+                                const InputDecoration(labelText: 'Dose amount'),
+                            menuMaxHeight: 360,
+                            items: [
+                              for (final value
+                                  in StructuredMedicationDirections.doseValues)
+                                DropdownMenuItem(
+                                  value: value,
+                                  child: Text('$value'),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setSheetState(() => doseValue = value);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<MedicationDoseUnit>(
+                            initialValue: doseUnit,
+                            decoration: const InputDecoration(labelText: 'Unit'),
+                            items: [
+                              for (final unit in MedicationDoseUnit.values)
+                                DropdownMenuItem(
+                                  value: unit,
+                                  child: Text('${unit.symbol} • ${unit.label}'),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setSheetState(() => doseUnit = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
@@ -234,28 +285,68 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: frequency,
-                      decoration: const InputDecoration(labelText: 'Frequency'),
-                      items: const [
-                        'Once',
-                        'Every 4 hours',
-                        'Every 6 hours',
-                        'Every 8 hours',
-                        'Daily',
-                      ]
-                          .map(
-                            (item) => DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
+                    const Text(
+                      'Frequency',
+                      style: TextStyle(
+                        color: Color(0xFF687587),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: frequencyCount,
+                            decoration:
+                                const InputDecoration(labelText: 'Times'),
+                            items: [
+                              for (final value in StructuredMedicationDirections
+                                  .frequencyCounts)
+                                DropdownMenuItem(
+                                  value: value,
+                                  child: Text('${value}x'),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setSheetState(() => frequencyCount = value);
+                              }
+                            },
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 9),
+                          child: Text(
+                            'per',
+                            style: TextStyle(
+                              color: medqurInk,
+                              fontWeight: FontWeight.w800,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setSheetState(() => frequency = value);
-                        }
-                      },
+                          ),
+                        ),
+                        Expanded(
+                          child: DropdownButtonFormField<MedicationFrequencyPeriod>(
+                            initialValue: frequencyPeriod,
+                            decoration:
+                                const InputDecoration(labelText: 'Period'),
+                            items: [
+                              for (final period
+                                  in MedicationFrequencyPeriod.values)
+                                DropdownMenuItem(
+                                  value: period,
+                                  child: Text(period.label),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setSheetState(() => frequencyPeriod = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     OutlinedButton.icon(
@@ -294,14 +385,63 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                           ),
                         ),
                     ],
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: chooseSchedule,
-                      icon: const Icon(Icons.schedule_rounded),
-                      label: Text(
-                        scheduledAt == null
-                            ? 'Schedule dose (optional)'
-                            : 'Due ${_formatDateTime(scheduledAt!)}',
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Due',
+                      style: TextStyle(
+                        color: Color(0xFF687587),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    SegmentedButton<MedicationDueMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: MedicationDueMode.immediate,
+                          icon: Icon(Icons.bolt_rounded),
+                          label: Text('Immediately'),
+                        ),
+                        ButtonSegment(
+                          value: MedicationDueMode.scheduled,
+                          icon: Icon(Icons.event_outlined),
+                          label: Text('On date / time'),
+                        ),
+                      ],
+                      selected: {dueMode},
+                      onSelectionChanged: (value) {
+                        setSheetState(() => dueMode = value.first);
+                      },
+                    ),
+                    if (dueMode == MedicationDueMode.scheduled) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: chooseSchedule,
+                        icon: const Icon(Icons.calendar_month_outlined),
+                        label: Text(
+                          scheduledAt == null
+                              ? 'Choose date and time'
+                              : 'Due ${ClinicalClock.dateTimeShort(scheduledAt!)}',
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'The first dose will be due immediately when the order is sent.',
+                        style: TextStyle(
+                          color: Color(0xFF748297),
+                          fontSize: 10.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Text(
+                      'Order summary: ${directions.doseText} • $route • ${directions.frequencyText}',
+                      style: const TextStyle(
+                        color: medqurInk,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 7),
@@ -317,18 +457,34 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                     FilledButton.icon(
                       onPressed: () {
                         final name = medication.text.trim();
-                        final doseValue = dose.text.trim();
-                        if (name.isEmpty || doseValue.isEmpty) return;
+                        if (name.isEmpty) return;
+                        if (dueMode == MedicationDueMode.scheduled &&
+                            scheduledAt == null) {
+                          ScaffoldMessenger.of(sheetContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('Choose the scheduled due date and time.'),
+                            ),
+                          );
+                          return;
+                        }
+                        final finalDirections = StructuredMedicationDirections(
+                          doseValue: doseValue,
+                          doseUnit: doseUnit,
+                          frequencyCount: frequencyCount,
+                          frequencyPeriod: frequencyPeriod,
+                          dueMode: dueMode,
+                          scheduledAt: scheduledAt,
+                        );
                         Navigator.of(sheetContext).pop(
                           MedicationOrder(
                             name: name,
-                            dose: doseValue,
+                            dose: finalDirections.doseText,
                             route: route,
-                            frequency: frequency,
+                            frequency: finalDirections.frequencyText,
                             orderedBy: widget.staff.name,
                             productCode: productCode,
                             productId: product?.id,
-                            scheduledAt: scheduledAt,
+                            scheduledAt: finalDirections.effectiveDueAt(),
                             productVerified: verified,
                           ),
                         );
@@ -346,7 +502,6 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
     );
 
     medication.dispose();
-    dose.dispose();
     if (order == null || !mounted) return;
 
     var finalOrder = order;
@@ -983,11 +1138,28 @@ class _PatientDetailPageV2State extends State<PatientDetailPageV2> {
                 ),
               ),
           const SizedBox(height: 20),
-          const SectionTitle('Encounter timeline'),
+          const SectionTitle(
+            'Encounter timeline',
+            trailing: StatusPill(
+              label: '24-hour clock',
+              color: medqurBlue,
+              icon: Icons.schedule_rounded,
+            ),
+          ),
           const SizedBox(height: 9),
           SoftCard(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Text(
+                  'All encounter times use HH:mm 24-hour format, so 06:37 and 18:37 are unambiguous.',
+                  style: TextStyle(
+                    color: Color(0xFF748297),
+                    fontSize: 10.5,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 for (var i = 0; i < patient.timeline.length; i++)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
