@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/prescription_signature_pad.dart';
 
+export '../widgets/prescription_signature_pad.dart' show PrescriptionSignature;
+
 class PrescriptionSignatureStore {
   static const _prefix = 'medqur_prescription_signature_v1_';
 
