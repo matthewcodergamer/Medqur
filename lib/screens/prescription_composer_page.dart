@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../clinical_clock.dart';
+import '../medication_order_options.dart';
 import '../models.dart';
 import '../services/medication_identifier.dart';
 import '../services/medication_master.dart';
@@ -34,7 +36,6 @@ class PrescriptionComposerPage extends StatefulWidget {
 
 class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
   final _medication = TextEditingController();
-  final _dose = TextEditingController();
   final _duration = TextEditingController();
   final _instructions = TextEditingController();
   final _registry = MedicationRegistryClient();
@@ -42,8 +43,13 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
   final _orderSignatureStore = PrescriptionSignatureStore();
   final _signatureVault = DoctorSignatureVault();
 
+  int _doseValue = 1;
+  MedicationDoseUnit _doseUnit = MedicationDoseUnit.milligram;
   String _route = 'Oral';
-  String _frequency = 'Twice daily';
+  int _frequencyCount = 1;
+  MedicationFrequencyPeriod _frequencyPeriod = MedicationFrequencyPeriod.day;
+  MedicationDueMode _dueMode = MedicationDueMode.immediate;
+
   String? _productCode;
   MedicationIdentifier? _identifier;
   MedicationResolution? _resolution;
@@ -52,6 +58,16 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
   List<StoredDoctorSignature> _signatures = const [];
   String? _selectedSignatureId;
   PrescriptionInk _ink = PrescriptionInk.blue;
+
+  StructuredMedicationDirections get _directions =>
+      StructuredMedicationDirections(
+        doseValue: _doseValue,
+        doseUnit: _doseUnit,
+        frequencyCount: _frequencyCount,
+        frequencyPeriod: _frequencyPeriod,
+        dueMode: _dueMode,
+        scheduledAt: _scheduledAt,
+      );
 
   StoredDoctorSignature? get _selectedSignature {
     if (_signatures.isEmpty) return null;
@@ -70,7 +86,6 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
   @override
   void dispose() {
     _medication.dispose();
-    _dose.dispose();
     _duration.dispose();
     _instructions.dispose();
     _registry.dispose();
@@ -97,6 +112,13 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
       ),
     );
     await _loadSignatures();
+  }
+
+  void _applyProductStrength(String strength) {
+    final preset = MedicationDosePreset.tryParse(strength);
+    if (preset == null) return;
+    _doseValue = preset.value;
+    _doseUnit = preset.unit;
   }
 
   Future<void> _scanMedication() async {
@@ -127,7 +149,7 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
       _resolution = resolution;
       if (product != null) {
         _medication.text = product.genericName;
-        if (_dose.text.trim().isEmpty) _dose.text = product.strength;
+        _applyProductStrength(product.strength);
       }
     });
   }
@@ -244,7 +266,7 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
     final identifier = MedicationIdentifierParser.parse(raw);
     setState(() {
       _medication.text = selected.genericName;
-      _dose.text = selected.strength;
+      _applyProductStrength(selected.strength);
       _productCode = raw;
       _identifier = identifier;
       _resolution = MedicationResolution(
@@ -281,15 +303,16 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
       initialTime: TimeOfDay.fromDateTime(initial),
     );
     if (time == null) return;
-    setState(
-      () => _scheduledAt = DateTime(
+    setState(() {
+      _dueMode = MedicationDueMode.scheduled;
+      _scheduledAt = DateTime(
         date.year,
         date.month,
         date.day,
         time.hour,
         time.minute,
-      ),
-    );
+      );
+    });
   }
 
   void _appendPhrase(String phrase) {
@@ -303,11 +326,19 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
 
   Future<void> _signAndPreview() async {
     final name = _medication.text.trim();
-    final dose = _dose.text.trim();
-    if (name.isEmpty || dose.isEmpty) {
-      _show('Medication and dose are required.');
+    if (name.isEmpty) {
+      _show('Medication is required.');
       return;
     }
+    if (_dueMode == MedicationDueMode.scheduled && _scheduledAt == null) {
+      _show('Choose the date and time for the scheduled dose.');
+      return;
+    }
+
+    final directions = _directions;
+    final dose = directions.doseText;
+    final frequency = directions.frequencyText;
+    final dueAt = directions.effectiveDueAt();
 
     var signature = _selectedSignature;
     if (signature == null) {
@@ -336,10 +367,10 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
           medicationText: name,
           dose: dose,
           route: _route,
-          frequency: _frequency,
+          frequency: frequency,
           productId:
               _uuid(_resolution?.product?.id) ? _resolution?.product?.id : null,
-          dueAt: _scheduledAt,
+          dueAt: dueAt,
           signaturePayload: prepared.payload,
           signatureSha256: prepared.digest,
           signatureSignedAt: prepared.signedAt,
@@ -368,12 +399,12 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
         name: name,
         dose: dose,
         route: _route,
-        frequency: _frequency,
+        frequency: frequency,
         orderedBy: widget.staff.name,
         productCode: _productCode,
         orderId: backendOrderId,
         productId: _resolution?.product?.id,
-        scheduledAt: _scheduledAt,
+        scheduledAt: dueAt,
         productVerified: _resolution?.approvedForClinicalAutomation == true,
       );
 
@@ -385,7 +416,7 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
         medication: name,
         dose: dose,
         route: _route,
-        frequency: _frequency,
+        frequency: frequency,
         duration: _duration.text.trim(),
         instructions: _instructions.text.trim(),
         ink: _ink,
@@ -395,7 +426,7 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
       );
 
       widget.patient.timeline.add(
-        '${_timeNow()} — Prescription $copyNumber signed by ${widget.staff.name} • signature ${prepared.digest.substring(0, 12)}',
+        '${ClinicalClock.time(DateTime.now())} — Prescription $copyNumber signed by ${widget.staff.name} • signature ${prepared.digest.substring(0, 12)}',
       );
 
       if (!mounted) return;
@@ -420,11 +451,6 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
         r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
       ).hasMatch(value);
 
-  String _timeNow() {
-    final now = TimeOfDay.now();
-    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-  }
-
   String _copyNumber() {
     final now = DateTime.now();
     final serial =
@@ -439,10 +465,10 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
   }
 
   String _scheduleLabel() {
+    if (_dueMode == MedicationDueMode.immediate) return 'Due immediately';
     final value = _scheduledAt;
-    if (value == null) return 'First dose time';
-    final local = value.toLocal();
-    return '${local.day}/${local.month}/${local.year} • ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    if (value == null) return 'Choose date and time';
+    return 'Due ${ClinicalClock.dateTimeShort(value)}';
   }
 
   @override
@@ -462,7 +488,7 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
               eyebrow: 'Doctor order',
               title: 'New prescription',
               subtitle:
-                  'Choose the medicine, write the directions, then sign and preview the hospital form.',
+                  'Choose the medicine, set controlled dose and frequency values, then sign and preview the hospital form.',
             ),
             const SizedBox(height: 18),
             _SectionLabel('Medicine'),
@@ -516,59 +542,136 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
             const SizedBox(height: 8),
             SoftCard(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
-                    controller: _dose,
-                    decoration: const InputDecoration(labelText: 'Dose'),
-                  ),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _route,
-                          decoration: const InputDecoration(labelText: 'Route'),
-                          items: const [
-                            'Oral',
-                            'IV',
-                            'IM',
-                            'Inhaled',
-                            'Topical',
-                            'Subcutaneous',
-                          ]
-                              .map((value) => DropdownMenuItem(
-                                    value: value,
-                                    child: Text(value),
-                                  ))
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => _route = value ?? _route),
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _doseValue,
+                          decoration:
+                              const InputDecoration(labelText: 'Dose amount'),
+                          menuMaxHeight: 360,
+                          items: [
+                            for (final value
+                                in StructuredMedicationDirections.doseValues)
+                              DropdownMenuItem(
+                                value: value,
+                                child: Text('$value'),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _doseValue = value);
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _frequency,
+                        child: DropdownButtonFormField<MedicationDoseUnit>(
+                          initialValue: _doseUnit,
+                          decoration: const InputDecoration(labelText: 'Unit'),
+                          items: [
+                            for (final unit in MedicationDoseUnit.values)
+                              DropdownMenuItem(
+                                value: unit,
+                                child: Text('${unit.symbol} • ${unit.label}'),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _doseUnit = value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: _route,
+                    decoration: const InputDecoration(labelText: 'Route'),
+                    items: const [
+                      'Oral',
+                      'IV',
+                      'IM',
+                      'Inhaled',
+                      'Topical',
+                      'Subcutaneous',
+                    ]
+                        .map((value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(value),
+                            ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _route = value ?? _route),
+                  ),
+                  const SizedBox(height: 10),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Frequency',
+                      style: TextStyle(
+                        color: Color(0xFF687587),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _frequencyCount,
                           decoration:
-                              const InputDecoration(labelText: 'Frequency'),
-                          items: const [
-                            'Once',
-                            'Every 4 hours',
-                            'Every 6 hours',
-                            'Every 8 hours',
-                            'Every 12 hours',
-                            'Daily',
-                            'Twice daily',
-                            'As needed',
-                          ]
-                              .map((value) => DropdownMenuItem(
-                                    value: value,
-                                    child: Text(value),
-                                  ))
-                              .toList(),
-                          onChanged: (value) => setState(
-                            () => _frequency = value ?? _frequency,
+                              const InputDecoration(labelText: 'Times'),
+                          items: [
+                            for (final value in StructuredMedicationDirections
+                                .frequencyCounts)
+                              DropdownMenuItem(
+                                value: value,
+                                child: Text('${value}x'),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _frequencyCount = value);
+                            }
+                          },
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 9),
+                        child: Text(
+                          'per',
+                          style: TextStyle(
+                            color: medqurInk,
+                            fontWeight: FontWeight.w800,
                           ),
+                        ),
+                      ),
+                      Expanded(
+                        child:
+                            DropdownButtonFormField<MedicationFrequencyPeriod>(
+                          initialValue: _frequencyPeriod,
+                          decoration:
+                              const InputDecoration(labelText: 'Period'),
+                          items: [
+                            for (final period
+                                in MedicationFrequencyPeriod.values)
+                              DropdownMenuItem(
+                                value: period,
+                                child: Text(period.label),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _frequencyPeriod = value);
+                            }
+                          },
                         ),
                       ),
                     ],
@@ -610,16 +713,79 @@ class _PrescriptionComposerPageState extends State<PrescriptionComposerPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    leading:
-                        const Icon(Icons.schedule_outlined, color: medqurBlue),
-                    title: const Text('Schedule'),
-                    subtitle: Text(_scheduleLabel()),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: _schedule,
+                  const SizedBox(height: 14),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Due',
+                      style: TextStyle(
+                        color: Color(0xFF687587),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  SegmentedButton<MedicationDueMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: MedicationDueMode.immediate,
+                        icon: Icon(Icons.bolt_rounded),
+                        label: Text('Immediately'),
+                      ),
+                      ButtonSegment(
+                        value: MedicationDueMode.scheduled,
+                        icon: Icon(Icons.event_outlined),
+                        label: Text('On date / time'),
+                      ),
+                    ],
+                    selected: {_dueMode},
+                    onSelectionChanged: (value) {
+                      setState(() => _dueMode = value.first);
+                    },
+                  ),
+                  if (_dueMode == MedicationDueMode.scheduled) ...[
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: const Icon(
+                        Icons.calendar_month_outlined,
+                        color: medqurBlue,
+                      ),
+                      title: const Text('Scheduled due date / time'),
+                      subtitle: Text(_scheduleLabel()),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _schedule,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'The first dose is due immediately when this order is signed.',
+                      style: TextStyle(
+                        color: Color(0xFF748297),
+                        fontSize: 10.5,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 9),
+                  Text(
+                    'Order summary: ${_directions.doseText} • $_route • ${_directions.frequencyText}',
+                    style: const TextStyle(
+                      color: medqurInk,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Dose amount, dose unit and frequency are controlled selections rather than free-text entry.',
+                    style: TextStyle(
+                      color: Color(0xFF748297),
+                      fontSize: 10.5,
+                      height: 1.35,
+                    ),
                   ),
                 ],
               ),
