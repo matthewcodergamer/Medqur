@@ -57,7 +57,7 @@ extension MedicationDueModeInfo on MedicationDueMode {
 ///
 /// The UI deliberately avoids free-text dose/frequency entry for these fields:
 /// dose amount is selected from 1–100, dose unit from a controlled unit list,
-/// and frequency from 1x–10x per hour/day/week.
+/// and frequency from 1x–20x per hour/day/week.
 class StructuredMedicationDirections {
   const StructuredMedicationDirections({
     required this.doseValue,
@@ -88,7 +88,10 @@ class StructuredMedicationDirections {
     91, 92, 93, 94, 95, 96, 97, 98, 99, 100,
   ];
 
-  static const List<int> frequencyCounts = <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  static const List<int> frequencyCounts = <int>[
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  ];
 
   String get doseText => '$doseValue ${doseUnit.symbol}';
 
