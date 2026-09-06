@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medqur/mock_data.dart';
+import 'package:medqur/screens/clinical_worklist_page.dart';
+import 'package:medqur/screens/doctor_orders_hub_page.dart';
 import 'package:medqur/screens/facility_screen.dart';
 import 'package:medqur/screens/home_dashboard_page.dart';
+import 'package:medqur/screens/patient_queue_page.dart';
 import 'package:medqur/widgets/common.dart';
 import 'package:medqur/widgets/medqur_design.dart';
 import 'package:medqur/widgets/medqur_responsive.dart';
@@ -119,6 +122,63 @@ void main() {
               staff: demoDoctor,
               onBack: () {},
               onStartShift: (_) {},
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final width in <double>[320, 390, 1440]) {
+      testWidgets('patient queue fits ${width.toInt()}px viewport',
+          (tester) async {
+        await _setViewport(tester, width, 900);
+        await tester.pumpWidget(
+          _host(
+            PatientQueuePage(
+              staff: demoDoctor,
+              patients: buildDemoPatients(),
+              onOpenPatient: (_) {},
+              onNewEncounter: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('doctor orders fits ${width.toInt()}px viewport',
+          (tester) async {
+        await _setViewport(tester, width, 900);
+        await tester.pumpWidget(
+          _host(
+            DoctorOrdersHubPage(
+              staff: demoDoctor,
+              patients: buildDemoPatients(),
+              diagnosticOrders: const [],
+              onOpenPatient: (_) {},
+              onCreatePrescription: () {},
+              onCreateDiagnosticOrder: () {},
+              onOpenDiagnosticOrder: (_) {},
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('clinical worklist fits ${width.toInt()}px viewport',
+          (tester) async {
+        await _setViewport(tester, width, 900);
+        await tester.pumpWidget(
+          _host(
+            ClinicalWorklistPage(
+              staff: demoNurse,
+              patients: buildDemoPatients(),
+              orders: const [],
+              onOpenPatient: (_) {},
+              onOpenOrder: (_) {},
             ),
           ),
         );
