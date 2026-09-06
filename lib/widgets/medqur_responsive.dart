@@ -129,6 +129,17 @@ class ResponsiveActions extends StatelessWidget {
       );
 }
 
+/// Compatibility spelling used by V0.14 prescribing code. This intentionally
+/// shares the same responsive behavior as [ResponsiveActions].
+class ResponsiveButtonRow extends ResponsiveActions {
+  const ResponsiveButtonRow({
+    super.key,
+    required super.children,
+    super.gap,
+    super.minActionWidth,
+  });
+}
+
 /// Adaptive grid used by compact dashboard summaries. It chooses fewer columns
 /// rather than allowing labels to wrap into broken-looking tiles.
 class ResponsiveGrid extends StatelessWidget {
