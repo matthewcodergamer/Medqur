@@ -75,7 +75,7 @@ void main() {
         frequencyPeriod: MedicationFrequencyPeriod.day,
         dueMode: MedicationDueMode.scheduled,
       );
-      expect(invalid.effectiveDueAt, throwsStateError);
+      expect(() => invalid.effectiveDueAt(), throwsStateError);
     });
   });
 
